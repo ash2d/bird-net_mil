@@ -60,7 +60,7 @@ labels_path = DEFAULT_LABELS_PATH
 # ---------------------------
 # UI Sidebar
 # ---------------------------
-logo_path = "logo-birdnet-circle.png"
+logo_path = "img/logo-birdnet-circle.png"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, width='content')
 

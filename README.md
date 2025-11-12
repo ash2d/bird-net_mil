@@ -1,4 +1,4 @@
-<div align="center"><img width="300" alt="BirdNET+ logo" src="logo-birdnet-circle.png"></div>
+<div align="center"><img width="300" alt="BirdNET+ logo" src="img/logo-birdnet-circle.png"></div>
 
 # birdnet-V3.0-dev
 CLI to analyze audio with BirdNET+ V3.0 developer preview models and export of per-chunk detections.
@@ -62,7 +62,9 @@ python analyze.py example/soundscape.wav --model models/BirdNET+_V3.0-preview1_E
 
 ## Streamlit web app
 
-An interactive UI to upload audio, view a spectrogram, run the model, and visualize results.
+For quick experimentation, we provide an interactive UI to upload audio, view a spectrogram, run the model, and visualize results.
+
+![Streamlit app screenshot](img/streamlit-ui-screenshot.png)
 
 ### Start the app
 ```bash
@@ -74,7 +76,7 @@ streamlit run app.py
 ```
 
 - The app opens in your browser (usually http://localhost:8501).
-- On first run, if you keep the default paths, the model and labels will be downloaded into models/.
+- On first run, if you keep the default paths, the model and labels will be downloaded into models.
 
 Headless/server usage (Linux):
 ```bash
