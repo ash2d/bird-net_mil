@@ -74,6 +74,18 @@ device_choice = st.sidebar.selectbox("Device", options=["cpu", "cuda"] if torch.
 playback_enabled = st.sidebar.checkbox("Show audio player", value=True)
 show_spectrogram = st.sidebar.checkbox("Show spectrogram", value=True)
 
+# Download species list (labels CSV)
+if os.path.isfile(labels_path):
+    with open(labels_path, "rb") as f:
+        st.sidebar.download_button(
+            "Download species list (CSV)",
+            data=f.read(),
+            file_name=os.path.basename(labels_path),
+            mime="text/csv",
+            type="secondary",
+        )
+    
+
 st.title("BirdNET+ V3.0 Developer Preview")
 st.caption("Developer preview; models, labels, and outputs may change with future releases.")
 
