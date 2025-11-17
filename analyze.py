@@ -4,8 +4,7 @@ import argparse
 import csv
 import os
 import sys
-from typing import List, Tuple
-
+from typing import List, Tuple, Optional
 import numpy as np
 import torch
 import librosa
@@ -14,12 +13,11 @@ import urllib.error
 import tempfile
 import shutil
 
-
 SR = 32000  # model expects 32 kHz
 
 # Defaults and hardcoded URLs (replace with actual links)
-DEFAULT_MODEL_PATH = "models/BirdNET+_V3.0-preview1_EUNA_1K_FP32.pt"
-DEFAULT_LABELS_PATH = "models/BirdNET+_V3.0-preview1_EUNA_1K_Labels.csv"
+DEFAULT_MODEL_PATH = "models/BirdNET+_V3.0-preview2_EUNA_1K_FP32.pt"
+DEFAULT_LABELS_PATH = "models/BirdNET+_V3.0-preview2_EUNA_1K_Labels.csv"
 DEFAULT_MODEL_URL = "https://zenodo.org/records/17571190/files/BirdNET+_V3.0-preview1_EUNA_1K_FP32.pt?download=1"
 DEFAULT_LABELS_URL = "https://zenodo.org/records/17571190/files/BirdNET+_V3.0-preview1_EUNA_1K_Labels.csv?download=1"
 
@@ -84,45 +82,106 @@ def chunk_audio(y: np.ndarray, chunk_length: float, overlap: float = 0.0, sr: in
     return np.stack(chunks, axis=0), spans
 
 
-def run_inference(model: torch.jit.ScriptModule, chunks: np.ndarray, device: torch.device, batch_size: int = 16) -> np.ndarray:
-    if chunks.shape[0] == 0:
-        return np.zeros((0, 0), dtype=np.float32)
+def run_inference(
+    model: torch.jit.ScriptModule,
+    chunks: np.ndarray,
+    device: torch.device,
+    batch_size: int = 16,
+    return_embeddings: bool = False,
+) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    """
+    Run inference with the new model that returns (embeddings, predictions).
 
-    outputs = []
+    Args:
+        model: TorchScript model returning (embeddings, predictions).
+        chunks: [N, T] float32 mono audio.
+        device: torch.device for inference.
+        batch_size: batch size.
+        return_embeddings: if True, also return stacked embeddings [N, D].
+
+    Returns:
+        predictions: [N, C] float32
+        embeddings: [N, D] float32 or None if return_embeddings=False
+    """
+    if chunks.shape[0] == 0:
+        return np.zeros((0, 0), dtype=np.float32), (np.zeros((0, 0), dtype=np.float32) if return_embeddings else None)
+
+    preds_out: List[np.ndarray] = []
+    embs_out: List[np.ndarray] = []
+
     with torch.inference_mode():
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
-            x = torch.from_numpy(batch).to(device)  # shape [B, T]
+            x = torch.from_numpy(batch).to(device)  # [B, T]
             out = model(x)
-            if out.ndim == 1:
-                out = out.unsqueeze(0)
-            outputs.append(out.detach().cpu().numpy().astype(np.float32))
-    return np.concatenate(outputs, axis=0)
+            # Expect (embeddings, predictions)
+            if not (isinstance(out, (tuple, list)) and len(out) == 2):
+                raise RuntimeError("Model is expected to return (embeddings, predictions).")
+            emb, pred = out
+
+            if pred.ndim == 1:
+                pred = pred.unsqueeze(0)
+            preds_out.append(pred.detach().cpu().numpy().astype(np.float32))
+
+            if return_embeddings:
+                if emb.ndim == 1:
+                    emb = emb.unsqueeze(0)
+                embs_out.append(emb.detach().cpu().numpy().astype(np.float32))
+
+    predictions = np.concatenate(preds_out, axis=0)
+    embeddings = np.concatenate(embs_out, axis=0) if return_embeddings and embs_out else None
+    return predictions, embeddings
 
 
-def save_per_chunk_csv(audio_path: str, spans: List[Tuple[float, float]], probs_chunks: np.ndarray, labels: List[str], out_csv: str, min_conf: float):
+def save_per_chunk_csv(
+    audio_path: str,
+    spans: List[Tuple[float, float]],
+    probs_chunks: np.ndarray,
+    labels: List[str],
+    out_csv: str,
+    min_conf: float,
+    export_embeddings: bool = False,
+    embeddings: Optional[np.ndarray] = None,
+):
     """Save rows for every (chunk,label) with confidence >= min_conf, sorted by descending confidence per chunk.
-    Columns: name,start_sec,end_sec,confidence,label
+    Columns:
+      - name,start_sec,end_sec,confidence,label
+      - if export_embeddings=True: add a single "embeddings" column containing the whole embedding vector
+        serialized as a comma-separated string wrapped in quotes (handled by csv writer).
     """
     out_dir = os.path.dirname(out_csv)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
     base = os.path.basename(audio_path)
     rows = 0
+
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["name", "start_sec", "end_sec", "confidence", "label"])
-        for (start, end), probs in zip(spans, probs_chunks):
+        w = csv.writer(f)  # default delimiter=",", quotechar='"', QUOTE_MINIMAL
+        header = ["name", "start_sec", "end_sec", "confidence", "label"]
+        if export_embeddings:
+            header += ["embeddings"]  # single column with the full vector as a quoted string
+        w.writerow(header)
+
+        for ci, ((start, end), probs) in enumerate(zip(spans, probs_chunks)):
             if probs.ndim != 1:
                 probs = probs.ravel()
             idx = np.where(probs >= min_conf)[0]
             if idx.size == 0:
                 continue
-            # Sort indices by descending confidence
             sort_order = np.argsort(-probs[idx])
+            # Prepare embedding string once per chunk if requested
+            emb_str = None
+            if export_embeddings and embeddings is not None and ci < len(embeddings):
+                vec = embeddings[ci].ravel().astype(np.float32)
+                # Comma-separated to force quoting in CSV
+                emb_str = ",".join(f"{v}" for v in vec)
+
             for j in idx[sort_order]:
                 conf = float(probs[j])
-                w.writerow([base, round(start, 3), round(end, 3), round(conf, 6), labels[j]])
+                row = [base, round(start, 3), round(end, 3), round(conf, 6), labels[j]]
+                if export_embeddings:
+                    row.append("" if emb_str is None else emb_str)
+                w.writerow(row)
                 rows += 1
     return rows
 
@@ -172,6 +231,7 @@ def main():
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cuda" if torch.cuda.is_available() else "cpu", help="Inference device")
     parser.add_argument("--out-csv", help="Path to write per-chunk CSV (default: <audio>.results.csv)")
     parser.add_argument("--min-conf", type=float, default=0.15, help="Minimum confidence threshold for exporting a detection (default: 0.15)")
+    parser.add_argument("--export-embeddings", action="store_true", help="Include per-chunk embedding vector columns in the output CSV")
     args = parser.parse_args()
     
     print(f"BirdNET+ V3.0 developer preview run on {args.audio}")
@@ -214,12 +274,23 @@ def main():
         print("No audio samples to process.", file=sys.stderr)
         sys.exit(1)
 
-    probs_chunks = run_inference(model, chunks, device=device)
+    probs_chunks, embeddings = run_inference(
+        model, chunks, device=device, return_embeddings=args.export_embeddings
+    )
 
     out_csv = args.out_csv if args.out_csv else (os.path.splitext(args.audio)[0] + ".results.csv")
-    rows = save_per_chunk_csv(args.audio, spans, probs_chunks, labels, out_csv, args.min_conf)
+    rows = save_per_chunk_csv(
+        args.audio,
+        spans,
+        probs_chunks,
+        labels,
+        out_csv,
+        args.min_conf,
+        export_embeddings=args.export_embeddings,
+        embeddings=embeddings,
+    )
 
-    print(f"Chunks processed: {len(chunks)}; detections exported: {rows} (min_conf={args.min_conf}, overlap={args.overlap})")
+    print(f"Chunks processed: {len(chunks)}; detections exported: {rows} (min_conf={args.min_conf}, overlap={args.overlap}, export_embeddings={args.export_embeddings})")
     print(f"CSV: {out_csv}")
     print(f"SR={SR}, Device={device}")
 

@@ -45,9 +45,10 @@ python analyze.py /path/to/audio.wav
 - `--device` cpu|cuda (default: auto)
 - `--min-conf` Minimum confidence threshold for exporting detections (default: 0.15)
 - `--out-csv` Output CSV path (default: <audio>.results.csv)
+- `--export-embeddings` Export per-chunk embeddings as additional column in results CSV
 
 ### Output
-- Per-chunk CSV with columns: `name,start_sec,end_sec,confidence,label`
+- Per-chunk CSV with columns: `name,start_sec,end_sec,confidence,label` and optionally `embeddings`
 - One row per (chunk, label) with confidence ≥ `--min-conf`
 - Multiple rows per chunk if multiple labels exceed threshold
 
@@ -56,11 +57,17 @@ python analyze.py /path/to/audio.wav
 # Minimal (uses defaults where available)
 python analyze.py example/soundscape.wav
 
-# Specify model, chunk length, min confidence, and output CSV
-python analyze.py example/soundscape.wav --chunk_length 2.0 --min-conf 0.2 --out-csv results.csv
+# Specify model, chunk length, min confidence, and output CSV with embeddings
+python analyze.py example/soundscape.wav --chunk_length 2.0 --min-conf 0.2 --out-csv results.csv --export-embeddings
 
 # Specify model and run on GPU
 python analyze.py example/soundscape.wav --model models/BirdNET+_V3.0-preview1_EUNA_1K_FP32.pt --device cuda
+```
+
+**Note:** The minimal model call will return embeddings and predictions for all chunks and needs to look like this:
+
+```python
+embeddings, predictions = model(input)
 ```
 
 ## Streamlit web app

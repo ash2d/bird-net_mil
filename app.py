@@ -152,7 +152,7 @@ if uploaded and y is not None and len(y) > 0:
 
     # Inference
     with st.spinner("Running inference..."):
-        probs_chunks = run_inference(model, chunks, device=device)
+        probs_chunks, _ = run_inference(model, chunks, device=device)
 
     if probs_chunks.shape[-1] != len(labels):
         c = min(probs_chunks.shape[-1], len(labels))
