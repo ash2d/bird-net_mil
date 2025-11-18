@@ -18,6 +18,10 @@ We will release updated models, labels, and code as we finalize the V3.0 release
 - Final architecture and model size
 - Additional non-target / environmental classes (human, rain, wind, engines, etc.)
 
+**Known issues:**
+- no human voice detection yet
+- the model struggles a bit with non-target sounds like rain, wind, engines (which it is not yet trained for)
+
 ### ⚠️ **Note:** This is a developer preview; models, labels, and code will change. Trained on a subset of data and may not reflect final performance.
 
 ## Install
@@ -38,8 +42,8 @@ python analyze.py /path/to/audio.wav
 ```
 
 ### Options
-- `--model` Path to model file (default: models/BirdNET+_V3.0-preview1_EUNA_1K_FP32.pt)
-- `--labels` Path to labels CSV (default: models/BirdNET+_V3.0-preview1_EUNA_1K_Labels.csv)
+- `--model` Path to model file (default: models/BirdNET+_V3.0-preview2_EUNA_1K_FP32.pt)
+- `--labels` Path to labels CSV (default: models/BirdNET+_V3.0-preview2_EUNA_1K_Labels.csv)
 - `--chunk_length` Chunk length in seconds (default: 3.0)
 - `--overlap` Chunk overlap in seconds (default: 0.0)
 - `--device` cpu|cuda (default: auto)
