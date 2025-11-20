@@ -13,6 +13,7 @@ import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import torch
+import time
 
 from analyze import (
     load_labels,
@@ -67,10 +68,11 @@ if os.path.exists(logo_path):
 st.sidebar.header("Settings")
 chunk_length = st.sidebar.number_input("Chunk length (s)", min_value=0.5, max_value=30.0, value=3.0, step=1.0)
 overlap = st.sidebar.number_input("Overlap (s)", min_value=0.0, max_value=29.9, value=0.0, step=0.5)
+batch_size = st.sidebar.number_input("Batch size", min_value=1, max_value=512, value=16, step=1)
 min_conf = st.sidebar.slider("Min confidence", min_value=0.0, max_value=1.0, value=0.25, step=0.05)
 agg_method = st.sidebar.selectbox("Aggregate method", options=["mean", "max"], index=0)
 top_n = st.sidebar.number_input("Top-N overall", min_value=1, max_value=25, value=10, step=1)
-device_choice = st.sidebar.selectbox("Device", options=["cpu", "cuda"] if torch.cuda.is_available() else ["cpu"], index=0)
+device_choice = st.sidebar.selectbox("Device", options=["cpu", "cuda"] if torch.cuda.is_available() else ["cpu"], index=1 if torch.cuda.is_available() else 0)
 playback_enabled = st.sidebar.checkbox("Show audio player", value=True)
 show_spectrogram = st.sidebar.checkbox("Show spectrogram", value=True)
 
@@ -93,19 +95,22 @@ st.caption("Developer preview; models, labels, and outputs may change with futur
 # File Uploader
 # ---------------------------
 audio_bytes = None
-uploaded = st.file_uploader("Upload an audio file", type=["wav", "mp3", "ogg", "flac", "m4a"])
+uploaded = st.file_uploader("Upload an audio file", type=["wav", "mp3", "ogg", "flac", "m4a"], )
 if uploaded:
     st.write(f"File: {uploaded.name} ({uploaded.type}, {uploaded.size/1024:.1f} KB)")
     try:
         audio_bytes = uploaded.getvalue()
         y = load_audio_bytes(audio_bytes, sr=SR)
         if show_spectrogram:
+            start_time = time.time()
             S_db = compute_mel_spectrogram(y, sr=SR)
             fig, ax = plt.subplots(figsize=(15, 3))
             librosa.display.specshow(S_db, sr=SR, hop_length=256, ax=ax)
             ax.set_axis_off()
             fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             st.pyplot(fig, width="stretch")
+            end_time = time.time()
+            st.write(f"Spectrogram computation time: {end_time - start_time:.2f} s")
         if playback_enabled and audio_bytes:
             st.audio(audio_bytes, format=uploaded.type or "audio/wav")
     except Exception as e:
@@ -121,6 +126,46 @@ if uploaded:
 # ---------------------------
 # Main logic (auto-runs on any change)
 # ---------------------------
+
+# Helper to produce Audacity labels TSV
+def make_tsv(csv_bytes: bytes) -> bytes:
+    import math
+    # Accept either bytes or str
+    if isinstance(csv_bytes, (bytes, bytearray)):
+        text = csv_bytes.decode("utf-8")
+    else:
+        text = str(csv_bytes)
+
+    output = io.StringIO()
+    reader = csv.DictReader(io.StringIO(text))
+
+    for row in reader:
+        # Extract fields
+        start_sec = row.get("start_sec", "")
+        end_sec = row.get("end_sec", "")
+        common_name = row.get("common_name", "")
+        confidence_raw = row.get("confidence", "")
+
+        # Convert confidence → percent with 2 decimals
+        confidence = ""
+        try:
+            if confidence_raw not in ("", None, "nan", "NaN"):
+                val = float(confidence_raw)
+                if not math.isnan(val):
+                    confidence = f"{val * 100:.2f}%"
+        except Exception:
+            confidence = ""
+
+        values = [
+            str(start_sec),
+            str(end_sec),
+            str(common_name) + ' ' + confidence,
+        ]
+        output.write("\t".join(values) + "\n")
+
+    # Return bytes so the download button behaves like your CSV download
+    return output.getvalue().encode("utf-8")
+
 if uploaded and y is not None and len(y) > 0:
     try:
         labels = cache_labels(labels_path)
@@ -142,6 +187,8 @@ if uploaded and y is not None and len(y) > 0:
     st.write(f"Audio duration: {duration:.2f} s, Sample rate: {SR} Hz")
 
     # Chunking
+    # Time inference
+    start_time = time.time()
     try:
         chunks, spans = chunk_audio(y, chunk_length=chunk_length, overlap=overlap, sr=SR)
     except Exception as e:
@@ -152,7 +199,7 @@ if uploaded and y is not None and len(y) > 0:
 
     # Inference
     with st.spinner("Running inference..."):
-        probs_chunks, _ = run_inference(model, chunks, device=device)
+        probs_chunks, _ = run_inference(model, chunks, device=device, batch_size=batch_size, return_embeddings=False)
 
     if probs_chunks.shape[-1] != len(labels):
         c = min(probs_chunks.shape[-1], len(labels))
@@ -217,8 +264,18 @@ if uploaded and y is not None and len(y) > 0:
             file_name=f"{os.path.splitext(uploaded.name)[0]}_detections.csv",
             mime="text/csv",
         )
+        tsv_bytes = make_tsv(csv_bytes)  # now returns bytes
+        st.download_button(
+            "Download Audacity Labels",
+            data=tsv_bytes,
+            file_name=f"{os.path.splitext(uploaded.name)[0]}_labels.txt",
+            mime="text/tab-separated-values",  # or 'text/plain'
+        )
+
     else:
         st.info("No detections above threshold.")
+    end_time = time.time()
+    st.write(f"Inference time: {end_time - start_time:.2f} s")
 else:
     if not uploaded:
         st.info("Upload an audio file to run inference automatically.")
@@ -226,3 +283,4 @@ else:
 # Footer
 st.markdown("---")
 st.caption("BirdNET+ V3.0 Preview.")
+

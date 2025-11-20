@@ -24,12 +24,33 @@ We will release updated models, labels, and code as we finalize the V3.0 release
 
 ### ⚠️ **Note:** This is a developer preview; models, labels, and code will change. Trained on a subset of data and may not reflect final performance.
 
-## Install
+## Install for Mac / Linux
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+## Install for Windows
+```bash
+python3 -m venv .venv
+source .venv/Scripts/activate
+pip install -r requirements.txt
+```
+
+### Optionally, on Windows, enable CUDA support
+This option requires you have an NVIDIA GPU with CUDA installed and visible to the environment, check for this by typing:
+```bash
+nvidia-smi
+```
+You should see a table showing information about your CUDA version and running processes:
+![alt text](image.png)
+
+If you do, then you can install a CUDA-enabled version of pyTorch:
+
+```bash
+pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
 
 ## Usage
 
@@ -56,6 +77,7 @@ python analyze.py /path/to/audio.wav
 - One row per (chunk, label) with confidence ≥ `--min-conf`
 - Multiple rows per chunk if multiple labels exceed threshold
 
+
 ## Examples
 ```bash
 # Minimal (uses defaults where available)
@@ -64,7 +86,7 @@ python analyze.py example/soundscape.wav
 # Specify model, chunk length, min confidence, and output CSV with embeddings
 python analyze.py example/soundscape.wav --chunk_length 2.0 --min-conf 0.2 --out-csv results.csv --export-embeddings
 
-# Specify model and run on GPU
+# Specify model and run on CUDA-enabled GPU
 python analyze.py example/soundscape.wav --model models/BirdNET+_V3.0-preview1_EUNA_1K_FP32.pt --device cuda
 ```
 
@@ -80,19 +102,26 @@ For quick experimentation, we provide an interactive UI to upload audio, view a 
 
 ![Streamlit app screenshot](img/streamlit-ui-screenshot.png)
 
+
 ### Start the app
 ```bash
 # Activate your venv first if you use one
 source .venv/bin/activate
+# N.B. On Windows use:
+source .venv/Scripts/activate
 
 # Run Streamlit
 streamlit run app.py
+
+# Alternatively, to increase 200 MB files size limit to e.g. 2GB
+streamlit run app.py --server.maxUploadSize 2048
+
 ```
 
 - The app opens in your browser (usually http://localhost:8501).
 - On first run, if you keep the default paths, the model and labels will be downloaded into models.
 
-Headless/server usage (Linux):
+### Headless/server usage (Linux):
 ```bash
 streamlit run app.py --server.address 0.0.0.0 --server.port 8501
 # then open http://<server-ip>:8501 in your browser
