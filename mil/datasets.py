@@ -1,0 +1,346 @@
+"""
+Dataset classes for MIL training with BirdNET embeddings.
+
+This module provides dataset and data loading utilities for training
+MIL models on pre-extracted embeddings with strong labels from AnuraSet.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+logger = logging.getLogger(__name__)
+
+
+def load_embeddings_npz(npz_path: str | Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Load embeddings from .npz file.
+    
+    Args:
+        npz_path: Path to .npz file created by embed_file.
+        
+    Returns:
+        Tuple of (embeddings, start_sec, end_sec) where:
+        - embeddings: (T, D) array of embeddings
+        - start_sec: (T,) array of chunk start times
+        - end_sec: (T,) array of chunk end times
+    """
+    data = np.load(npz_path)
+    embeddings = data["embeddings"].astype(np.float32)
+    start_sec = data["start_sec"].astype(np.float32)
+    end_sec = data["end_sec"].astype(np.float32)
+    return embeddings, start_sec, end_sec
+
+
+def parse_strong_labels(txt_path: str | Path) -> List[Tuple[float, float, str]]:
+    """
+    Parse AnuraSet strong label file.
+    
+    Format: Each line contains "<start_sec> <end_sec> <species> [quality]"
+    
+    Args:
+        txt_path: Path to strong label .txt file.
+        
+    Returns:
+        List of (start_sec, end_sec, species) tuples.
+    """
+    events = []
+    txt_path = Path(txt_path)
+    
+    if not txt_path.exists():
+        return events
+    
+    with open(txt_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            try:
+                start = float(parts[0])
+                end = float(parts[1])
+                species = parts[2]
+                events.append((start, end, species))
+            except ValueError:
+                logger.warning(f"Failed to parse line in {txt_path}: {line}")
+                continue
+    
+    return events
+
+
+def build_label_index(
+    strong_root: str | Path | None = None,
+    species_list: List[str] | None = None,
+) -> Dict[str, int]:
+    """
+    Build a mapping from species names to class indices.
+    
+    Either scans strong label directory to discover all species,
+    or uses a provided species list.
+    
+    Args:
+        strong_root: Root directory containing strong label .txt files.
+        species_list: Optional explicit list of species to include.
+        
+    Returns:
+        Dictionary mapping species name to class index.
+    """
+    if species_list is not None:
+        all_species = sorted(set(species_list))
+    elif strong_root is not None:
+        strong_root = Path(strong_root)
+        all_species = set()
+        
+        # Scan all .txt files for species names
+        for txt_path in strong_root.glob("**/*.txt"):
+            events = parse_strong_labels(txt_path)
+            for _, _, species in events:
+                all_species.add(species)
+        
+        all_species = sorted(all_species)
+        logger.info(f"Found {len(all_species)} species in strong labels")
+    else:
+        raise ValueError("Must provide either strong_root or species_list")
+    
+    return {sp: i for i, sp in enumerate(all_species)}
+
+
+def events_to_labels(
+    events: List[Tuple[float, float, str]],
+    label_index: Dict[str, int],
+    start_sec: np.ndarray,
+    end_sec: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Convert strong label events to weak and per-second labels.
+    
+    A chunk is considered positive for a species if any event
+    overlaps with the chunk's time interval.
+    
+    Args:
+        events: List of (start, end, species) tuples.
+        label_index: Mapping from species to class index.
+        start_sec: (T,) array of chunk start times.
+        end_sec: (T,) array of chunk end times.
+        
+    Returns:
+        Tuple of:
+        - weak_labels: (C,) binary array for clip-level presence
+        - time_labels: (T, C) binary array for per-second labels
+    """
+    T = len(start_sec)
+    C = len(label_index)
+    
+    weak_labels = np.zeros((C,), dtype=np.float32)
+    time_labels = np.zeros((T, C), dtype=np.float32)
+    
+    for start, end, species in events:
+        if species not in label_index:
+            continue
+        
+        c = label_index[species]
+        weak_labels[c] = 1.0
+        
+        # Mark overlapping chunks as positive
+        # Overlap condition: chunk_start < event_end AND chunk_end > event_start
+        overlaps = (start_sec < end) & (end_sec > start)
+        time_labels[overlaps, c] = 1.0
+    
+    return weak_labels, time_labels
+
+
+def _find_strong_label_file(
+    npz_path: Path,
+    strong_root: Path,
+) -> Optional[Path]:
+    """
+    Find matching strong label file for an embedding file.
+    
+    Tries several strategies:
+    1. Same stem with .txt extension in corresponding subdirectory
+    2. Direct stem match in any subdirectory
+    
+    Args:
+        npz_path: Path to .embeddings.npz file.
+        strong_root: Root directory of strong labels.
+        
+    Returns:
+        Path to matching .txt file or None if not found.
+    """
+    # Get stem without .embeddings suffix
+    stem = npz_path.stem
+    if stem.endswith(".embeddings"):
+        stem = stem[:-11]  # Remove ".embeddings"
+    
+    # Try to preserve directory structure
+    # e.g., embeddings/SITE_A/REC_001.embeddings.npz -> strong_labels/SITE_A/REC_001.txt
+    try:
+        # Check if parent directory matches a site
+        site_dir = npz_path.parent.name
+        candidate = strong_root / site_dir / f"{stem}.txt"
+        if candidate.exists():
+            return candidate
+    except Exception:
+        pass
+    
+    # Try direct match
+    candidate = strong_root / f"{stem}.txt"
+    if candidate.exists():
+        return candidate
+    
+    # Search all subdirectories
+    for txt_path in strong_root.glob(f"**/{stem}.txt"):
+        return txt_path
+    
+    return None
+
+
+class EmbeddingBagDataset(Dataset):
+    """
+    Dataset for MIL training on pre-extracted embeddings.
+    
+    Loads .embeddings.npz files and matches them with strong labels
+    to produce weak (clip-level) and per-second labels.
+    """
+    
+    def __init__(
+        self,
+        npz_paths: List[str | Path] | str,
+        strong_root: str | Path | None = None,
+        label_index: Dict[str, int] | None = None,
+        species_list: List[str] | None = None,
+    ):
+        """
+        Initialize dataset.
+        
+        Args:
+            npz_paths: List of paths to .embeddings.npz files, or glob pattern.
+            strong_root: Root directory of strong label files.
+            label_index: Pre-built label index. If None, will build from strong_root.
+            species_list: Optional species list for building label index.
+        """
+        # Handle glob pattern
+        if isinstance(npz_paths, str):
+            import glob
+            self.npz_paths = [Path(p) for p in sorted(glob.glob(npz_paths))]
+        else:
+            self.npz_paths = [Path(p) for p in npz_paths]
+        
+        if len(self.npz_paths) == 0:
+            raise ValueError("No .npz files found")
+        
+        self.strong_root = Path(strong_root) if strong_root else None
+        
+        # Build or use provided label index
+        if label_index is not None:
+            self.label_index = label_index
+        elif species_list is not None:
+            self.label_index = build_label_index(species_list=species_list)
+        elif strong_root is not None:
+            self.label_index = build_label_index(strong_root=strong_root)
+        else:
+            raise ValueError("Must provide label_index, species_list, or strong_root")
+        
+        self.n_classes = len(self.label_index)
+        
+        # Build mapping from npz to strong label files
+        self.strong_paths: Dict[int, Optional[Path]] = {}
+        if self.strong_root:
+            for i, npz_path in enumerate(self.npz_paths):
+                self.strong_paths[i] = _find_strong_label_file(npz_path, self.strong_root)
+        
+        logger.info(
+            f"Dataset initialized with {len(self.npz_paths)} files, "
+            f"{self.n_classes} classes"
+        )
+    
+    def __len__(self) -> int:
+        return len(self.npz_paths)
+    
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Tuple[np.ndarray, np.ndarray]]:
+        """
+        Get a single sample.
+        
+        Returns:
+            Tuple of:
+            - embeddings: (T, D) tensor
+            - weak_labels: (C,) tensor of clip-level labels
+            - time_labels: (T, C) tensor of per-second labels
+            - times: tuple of (start_sec, end_sec) arrays
+        """
+        npz_path = self.npz_paths[idx]
+        
+        # Load embeddings
+        embeddings, start_sec, end_sec = load_embeddings_npz(npz_path)
+        
+        # Load and convert strong labels
+        strong_path = self.strong_paths.get(idx)
+        if strong_path and strong_path.exists():
+            events = parse_strong_labels(strong_path)
+        else:
+            events = []
+        
+        weak_labels, time_labels = events_to_labels(
+            events, self.label_index, start_sec, end_sec
+        )
+        
+        return (
+            torch.from_numpy(embeddings),
+            torch.from_numpy(weak_labels),
+            torch.from_numpy(time_labels),
+            (start_sec, end_sec),
+        )
+    
+    def get_embedding_dim(self) -> int:
+        """Get embedding dimension from first sample."""
+        embeddings, _, _ = load_embeddings_npz(self.npz_paths[0])
+        return embeddings.shape[1]
+    
+    def get_index_to_species(self) -> Dict[int, str]:
+        """Get reverse mapping from class index to species name."""
+        return {i: sp for sp, i in self.label_index.items()}
+
+
+def collate_fn(
+    batch: List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Tuple[np.ndarray, np.ndarray]]]
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[Tuple[np.ndarray, np.ndarray]]]:
+    """
+    Collate function that pads variable-length sequences.
+    
+    Args:
+        batch: List of (embeddings, weak_labels, time_labels, times) tuples.
+        
+    Returns:
+        Tuple of:
+        - embeddings: (B, T_max, D) padded tensor
+        - weak_labels: (B, C) tensor
+        - time_labels: (B, T_max, C) padded tensor
+        - times: list of (start_sec, end_sec) tuples
+    """
+    embeddings_list, weak_list, time_list, times_list = zip(*batch)
+    
+    B = len(batch)
+    T_max = max(e.shape[0] for e in embeddings_list)
+    D = embeddings_list[0].shape[1]
+    C = weak_list[0].shape[0]
+    
+    # Pad embeddings and time labels
+    embeddings_padded = torch.zeros(B, T_max, D, dtype=torch.float32)
+    time_labels_padded = torch.zeros(B, T_max, C, dtype=torch.float32)
+    
+    for i, (emb, time_lab) in enumerate(zip(embeddings_list, time_list)):
+        T = emb.shape[0]
+        embeddings_padded[i, :T] = emb
+        time_labels_padded[i, :T] = time_lab
+    
+    weak_labels = torch.stack(weak_list, dim=0)
+    
+    return embeddings_padded, weak_labels, time_labels_padded, list(times_list)

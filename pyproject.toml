@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bird-mil"
+version = "0.1.0"
+description = "Multiple-Instance Learning pooling heads for BirdNET V3 embeddings"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "BirdMIL Contributors"},
+]
+keywords = ["bioacoustics", "deep-learning", "mil", "birdnet", "pytorch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.1",
+    "torchaudio>=2.1",
+    "librosa>=0.10",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+wandb = [
+    "wandb>=0.15",
+]
+app = [
+    "streamlit>=1.32",
+]
+all = [
+    "bird-mil[dev,wandb,app]",
+]
+
+[project.scripts]
+export-embeddings = "scripts.export_embeddings:main"
+train-mil = "scripts.train_mil:main"
+plot-attention = "scripts.plot_attention:main"
+
+[project.urls]
+Homepage = "https://github.com/ash2d/bird-net_mil"
+Documentation = "https://github.com/ash2d/bird-net_mil#readme"
+Repository = "https://github.com/ash2d/bird-net_mil"
+Issues = "https://github.com/ash2d/bird-net_mil/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["birdnetv3*", "mil*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["birdnetv3", "mil"]
