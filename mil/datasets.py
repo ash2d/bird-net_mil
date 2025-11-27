@@ -7,6 +7,7 @@ MIL models on pre-extracted embeddings with strong labels from AnuraSet.
 
 from __future__ import annotations
 
+import glob
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -229,7 +230,6 @@ class EmbeddingBagDataset(Dataset):
         """
         # Handle glob pattern
         if isinstance(npz_paths, str):
-            import glob
             self.npz_paths = [Path(p) for p in sorted(glob.glob(npz_paths))]
         else:
             self.npz_paths = [Path(p) for p in npz_paths]

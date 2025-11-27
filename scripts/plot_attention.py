@@ -51,6 +51,14 @@ from mil.evaluate import (
     plot_deletion_insertion,
 )
 
+# Optional wandb import
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    wandb = None  # type: ignore
+    WANDB_AVAILABLE = False
+
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging."""
@@ -265,37 +273,36 @@ def main() -> int:
         
         # W&B logging
         if args.wandb:
-            try:
-                import wandb
-                
-                wandb.init(
-                    project=args.wandb_project,
-                    entity=args.wandb_entity,
-                    name=f"attention_{npz_path.stem}_{args.class_name}",
-                    job_type="visualization",
-                )
-                
-                wandb.log({
-                    "attention_plot": wandb.Image(str(out_path)),
-                    "class_name": args.class_name,
-                    "npz_file": str(npz_path),
-                })
-                
-                if args.del_ins:
-                    from mil.evaluate import compute_auc
-                    wandb.log({
-                        "deletion_insertion_plot": wandb.Image(str(del_ins_path)),
-                        "deletion_auc": compute_auc(fractions, del_scores),
-                        "insertion_auc": compute_auc(fractions, ins_scores),
-                    })
-                
-                wandb.finish()
-                logger.info("Logged to W&B")
-                
-            except ImportError:
+            if not WANDB_AVAILABLE:
                 logger.warning("wandb not installed, skipping W&B logging")
-            except Exception as e:
-                logger.warning(f"Failed to log to W&B: {e}")
+            else:
+                try:
+                    wandb.init(
+                        project=args.wandb_project,
+                        entity=args.wandb_entity,
+                        name=f"attention_{npz_path.stem}_{args.class_name}",
+                        job_type="visualization",
+                    )
+                    
+                    wandb.log({
+                        "attention_plot": wandb.Image(str(out_path)),
+                        "class_name": args.class_name,
+                        "npz_file": str(npz_path),
+                    })
+                    
+                    if args.del_ins:
+                        from mil.evaluate import compute_auc
+                        wandb.log({
+                            "deletion_insertion_plot": wandb.Image(str(del_ins_path)),
+                            "deletion_auc": compute_auc(fractions, del_scores),
+                            "insertion_auc": compute_auc(fractions, ins_scores),
+                        })
+                    
+                    wandb.finish()
+                    logger.info("Logged to W&B")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to log to W&B: {e}")
         
         logger.info("Done!")
         return 0

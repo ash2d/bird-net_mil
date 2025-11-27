@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchaudio
 from torch.utils.data import DataLoader
 
 from .heads import PoolingHead
@@ -206,8 +207,6 @@ def compute_spectrogram(
     Returns:
         Tuple of (spectrogram, times, frequencies).
     """
-    import torchaudio
-    
     wav, orig_sr = torchaudio.load(str(audio_path))
     
     # Convert to mono

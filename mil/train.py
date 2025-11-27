@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +19,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .heads import PoolingHead, PROB_SPACE_POOLERS
+
+# Optional wandb import
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    wandb = None  # type: ignore
+    WANDB_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -215,35 +223,34 @@ class Trainer:
         self.losses: Dict[str, List[float]] = {"train": [], "val": []}
         
         # W&B setup
-        self.use_wandb = use_wandb
+        self.use_wandb = use_wandb and WANDB_AVAILABLE
         self.wandb_run = None
         
         if use_wandb:
-            try:
-                import wandb
-                
-                config = {
-                    "pool_name": head.pool_name,
-                    "n_classes": head.n_classes,
-                    "in_dim": head.in_dim,
-                    "lr": lr,
-                    **(wandb_config or {}),
-                }
-                
-                self.wandb_run = wandb.init(
-                    project=wandb_project,
-                    entity=wandb_entity,
-                    config=config,
-                    name=f"{head.pool_name}",
-                    reinit=True,
-                )
-                logger.info(f"W&B run initialized: {self.wandb_run.name}")
-            except ImportError:
+            if not WANDB_AVAILABLE:
                 logger.warning("wandb not installed, disabling W&B logging")
                 self.use_wandb = False
-            except Exception as e:
-                logger.warning(f"Failed to initialize W&B: {e}")
-                self.use_wandb = False
+            else:
+                try:
+                    config = {
+                        "pool_name": head.pool_name,
+                        "n_classes": head.n_classes,
+                        "in_dim": head.in_dim,
+                        "lr": lr,
+                        **(wandb_config or {}),
+                    }
+                    
+                    self.wandb_run = wandb.init(
+                        project=wandb_project,
+                        entity=wandb_entity,
+                        config=config,
+                        name=f"{head.pool_name}",
+                        reinit=True,
+                    )
+                    logger.info(f"W&B run initialized: {self.wandb_run.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize W&B: {e}")
+                    self.use_wandb = False
     
     def train(
         self,
@@ -287,8 +294,7 @@ class Trainer:
             logger.info(log_msg)
             
             # W&B logging
-            if self.use_wandb and self.wandb_run:
-                import wandb
+            if self.use_wandb and self.wandb_run and wandb is not None:
                 log_dict = {"epoch": epoch, "train_loss": train_loss}
                 if val_loss is not None:
                     log_dict["val_loss"] = val_loss
@@ -315,9 +321,7 @@ class Trainer:
         self.save_results()
         
         # Finish W&B run
-        if self.use_wandb and self.wandb_run:
-            import wandb
-            
+        if self.use_wandb and self.wandb_run and wandb is not None:
             # Log final artifacts
             loss_csv = self.out_dir / f"loss_{self.head.pool_name}.csv"
             loss_png = self.out_dir / f"loss_{self.head.pool_name}.png"
@@ -372,7 +376,14 @@ def load_checkpoint(
         
     Returns:
         Tuple of (model, checkpoint_dict).
+        
+    Note:
+        This function loads checkpoints that contain metadata (pool_name, etc.)
+        in addition to model weights. Only load checkpoints from trusted sources.
     """
+    # Note: We need weights_only=False because our checkpoints contain
+    # metadata like pool_name, n_classes, etc. in addition to model weights.
+    # Only load checkpoints from trusted sources.
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     head = PoolingHead(
