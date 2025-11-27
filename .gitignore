@@ -6,6 +6,13 @@ models/*.onnx
 # Ignore result files
 *.results.csv
 
+# Ignore embedding files (large)
+*.embeddings.npz
+
+# Ignore training outputs
+runs/
+wandb/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

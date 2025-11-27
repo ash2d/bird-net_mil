@@ -1,0 +1,43 @@
+# Default configuration for bird-mil training
+# Use with --config configs/default.yaml
+
+# Data settings
+data:
+  emb_dir: "/data/embeddings"
+  strong_root: "/data/anuraset/strong_labels"
+  val_split: 0.1
+
+# Model settings  
+model:
+  poolers:
+    - lme
+    - attn
+    - autopool
+    - linsoft
+    - noisyor
+    - mean
+    - max
+
+# Training settings
+training:
+  epochs: 20
+  batch_size: 32
+  lr: 0.001
+  early_stop: 0
+
+# Output settings
+output:
+  out_dir: "runs"
+
+# Embedding extraction settings
+embedding:
+  chunk_length: 1.0
+  overlap: 0.0
+  batch_size: 64
+  preserve_structure: true
+
+# W&B settings (optional)
+wandb:
+  enabled: false
+  project: "bird-mil"
+  entity: null
