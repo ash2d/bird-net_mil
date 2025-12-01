@@ -217,28 +217,63 @@ bird-net_mil/
 
 ### Dataset Layout (AnuraSet)
 
-The MIL pipeline expects data organized as follows:
+The MIL pipeline expects data organized as follows. Each 1-minute recording is split into overlapping 3-second clips (sliding by 1 second), and strong labels are provided per recording.
 
 ```
 /data/
 ├── anuraset/
 │   ├── wavs/                 # Preprocessed 3-s clips by site
 │   │   ├── SITE_A/
-│   │   │   ├── REC_000001.wav
-│   │   │   └── REC_000002.wav
+│   │   │   ├── REC_000001_0_3.wav    # Recording REC_000001, seconds 0-3
+│   │   │   ├── REC_000001_1_4.wav    # Recording REC_000001, seconds 1-4
+│   │   │   ├── REC_000001_2_5.wav    # Recording REC_000001, seconds 2-5
+│   │   │   ├── ...
+│   │   │   └── REC_000002_0_3.wav
 │   │   └── SITE_B/...
 │   ├── metadata.csv          # Class labels (multi-label)
-│   └── strong_labels/        # Per-event annotations
+│   └── strong_labels/        # Per-event annotations (one file per recording)
 │       ├── SITE_A/
-│       │   ├── REC_000001.txt  # Lines: "<start_sec> <end_sec> <species> [quality]"
+│       │   ├── REC_000001.txt  # Lines: "<start_sec> <end_sec> <species_quality>"
 │       │   └── REC_000002.txt
 │       └── SITE_B/...
 └── embeddings/               # Output from embedding extraction
     ├── SITE_A/
-    │   ├── REC_000001.embeddings.npz
-    │   └── REC_000002.embeddings.npz
+    │   ├── REC_000001_0_3.embeddings.npz
+    │   ├── REC_000001_1_4.embeddings.npz
+    │   └── ...
     └── SITE_B/...
 ```
+
+#### Clip Filename Format
+
+Each 3-second clip filename follows the pattern: `<recording_id>_<start_sec>_<end_sec>.wav`
+
+- `REC_000001_0_3.wav` - Recording REC_000001, from second 0 to second 3
+- `REC_000001_1_4.wav` - Recording REC_000001, from second 1 to second 4
+- `REC_000001_2_5.wav` - Recording REC_000001, from second 2 to second 5
+
+#### Strong Label Format
+
+Strong labels are per-recording annotation files with one event per line:
+
+```
+<start_sec> <end_sec> <species_quality>
+```
+
+Where `<species_quality>` is the species name followed by an underscore and an audio quality indicator (L=low, M=medium, H=high).
+
+**Example** (`REC_000001.txt`):
+```
+0.5 2.3 Boana_faber_H
+1.2 4.5 Dendropsophus_minutus_M
+15.0 18.0 Scinax_fuscovarius_L
+```
+
+The code automatically:
+- Extracts the recording ID from clip filenames (e.g., `REC_000001_0_3` → `REC_000001`)
+- Matches clips to their corresponding strong label file
+- Parses species names by removing the quality suffix (e.g., `Boana_faber_H` → `Boana_faber`)
+- Assigns labels to clips based on time overlap between clip boundaries and event boundaries
 
 ### Available Pooling Heads
 
