@@ -223,13 +223,13 @@ def extract_recording_id(clip_stem: str) -> str:
     # Pattern: <recording_id>_<start>_<end> where start and end are integers
     parts = clip_stem.rsplit('_', 2)
     
-    if len(parts) >= 3:
+    if len(parts) == 3:
         # Check if last two parts are numeric (start and end seconds)
         try:
             int(parts[-1])  # end
             int(parts[-2])  # start
             # This is the new format, return everything before the last two underscores
-            return '_'.join(parts[:-2])
+            return parts[0]
         except ValueError:
             pass
     
