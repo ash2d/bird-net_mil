@@ -75,18 +75,18 @@ class TestExtractRecordingId:
     
     def test_extract_new_format(self):
         """Test extraction from new format filename."""
-        rec_id = extract_recording_id("REC_000001_0_3")
-        assert rec_id == "REC_000001"
+        rec_id = extract_recording_id("INCT17_20200211_041500_0_3")
+        assert rec_id == "INCT17_20200211_041500"
     
     def test_extract_new_format_longer(self):
         """Test extraction from new format with longer time values."""
-        rec_id = extract_recording_id("REC_000001_57_60")
-        assert rec_id == "REC_000001"
+        rec_id = extract_recording_id("INCT17_20200211_041500_57_60")
+        assert rec_id == "INCT17_20200211_041500"
     
     def test_extract_old_format(self):
         """Test extraction from old format filename."""
-        rec_id = extract_recording_id("REC_000001")
-        assert rec_id == "REC_000001"
+        rec_id = extract_recording_id("INCT17_20200211_041500")
+        assert rec_id == "INCT17_20200211_041500"
     
     def test_extract_complex_recording_id(self):
         """Test extraction when recording ID contains underscores."""
@@ -95,13 +95,13 @@ class TestExtractRecordingId:
     
     def test_extract_non_numeric_suffix(self):
         """Test extraction when suffix is not numeric."""
-        rec_id = extract_recording_id("REC_000001_abc")
-        assert rec_id == "REC_000001_abc"  # No change
+        rec_id = extract_recording_id("INCT17_20200211_041500_abc")
+        assert rec_id == "INCT17_20200211_041500_abc"  # No change
     
     def test_extract_single_underscore(self):
         """Test extraction with single underscore."""
-        rec_id = extract_recording_id("REC_001")
-        assert rec_id == "REC_001"
+        rec_id = extract_recording_id("INCT17_001")
+        assert rec_id == "INCT17_001"
 
 
 class TestParseStrongLabels:
@@ -109,7 +109,7 @@ class TestParseStrongLabels:
     
     def test_parse_strong_labels_new_format(self, tmp_path):
         """Test parsing strong labels in new format."""
-        label_file = tmp_path / "REC_000001.txt"
+        label_file = tmp_path / "INCT17_20200211_041500.txt"
         label_file.write_text(
             "0.5 2.3 Boana_faber_H\n"
             "1.2 4.5 Dendropsophus_minutus_M\n"
@@ -125,7 +125,7 @@ class TestParseStrongLabels:
     
     def test_parse_strong_labels_no_quality(self, tmp_path):
         """Test parsing strong labels without quality indicators."""
-        label_file = tmp_path / "REC_000001.txt"
+        label_file = tmp_path / "INCT17_20200211_041500.txt"
         label_file.write_text("0.5 2.3 Boana_faber\n")
         
         events = parse_strong_labels(label_file)
@@ -149,7 +149,7 @@ class TestParseStrongLabels:
     
     def test_parse_strong_labels_with_blank_lines(self, tmp_path):
         """Test parsing with blank lines."""
-        label_file = tmp_path / "REC_000001.txt"
+        label_file = tmp_path / "INCT17_20200211_041500.txt"
         label_file.write_text(
             "0.5 2.3 Boana_faber_H\n"
             "\n"
@@ -171,13 +171,13 @@ class TestFindStrongLabelFile:
         site_dir = strong_root / "SITE_A"
         site_dir.mkdir(parents=True)
         
-        label_file = site_dir / "REC_000001.txt"
+        label_file = site_dir / "INCT17_20200211_041500.txt"
         label_file.write_text("0.5 2.3 Boana_faber_H\n")
         
         emb_dir = tmp_path / "embeddings" / "SITE_A"
         emb_dir.mkdir(parents=True)
         
-        npz_path = emb_dir / "REC_000001_0_3.embeddings.npz"
+        npz_path = emb_dir / "INCT17_20200211_041500_0_3.embeddings.npz"
         
         found = _find_strong_label_file(npz_path, strong_root)
         
@@ -189,13 +189,13 @@ class TestFindStrongLabelFile:
         site_dir = strong_root / "SITE_A"
         site_dir.mkdir(parents=True)
         
-        label_file = site_dir / "REC_000001.txt"
+        label_file = site_dir / "INCT17_20200211_041500.txt"
         label_file.write_text("0.5 2.3 Boana_faber_H\n")
         
         emb_dir = tmp_path / "embeddings" / "SITE_A"
         emb_dir.mkdir(parents=True)
         
-        npz_path = emb_dir / "REC_000001.embeddings.npz"
+        npz_path = emb_dir / "INCT17_20200211_041500.embeddings.npz"
         
         found = _find_strong_label_file(npz_path, strong_root)
         
@@ -206,7 +206,7 @@ class TestFindStrongLabelFile:
         strong_root = tmp_path / "strong_labels"
         strong_root.mkdir(parents=True)
         
-        npz_path = tmp_path / "REC_000001_0_3.embeddings.npz"
+        npz_path = tmp_path / "INCT17_20200211_041500_0_3.embeddings.npz"
         
         found = _find_strong_label_file(npz_path, strong_root)
         

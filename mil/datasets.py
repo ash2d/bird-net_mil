@@ -210,26 +210,33 @@ def extract_recording_id(clip_stem: str) -> str:
     Extract recording ID from clip filename stem.
     
     Handles two filename formats:
-    1. New format: "REC_000001_0_3" -> "REC_000001" (removes _startSec_endSec suffix)
-    2. Old format: "REC_000001" -> "REC_000001" (no change)
+    1. New format: "INCT17_20200211_041500_7_10" -> "INCT17_20200211_041500" (removes _startSec_endSec suffix)
+    2. Old format: "INCT17_20200211_041500" -> "INCT17_20200211_041500" (no change)
+    
+    The recording ID can contain underscores. The last two underscore-separated
+    values are the clip start and end times in seconds.
     
     Args:
-        clip_stem: Filename stem of the clip (e.g., "REC_000001_0_3")
+        clip_stem: Filename stem of the clip (e.g., "INCT17_20200211_041500_7_10")
         
     Returns:
-        Recording ID without clip time suffix (e.g., "REC_000001")
+        Recording ID without clip time suffix (e.g., "INCT17_20200211_041500")
     """
     # Try to detect if this is the new format with _start_end suffix
     # Pattern: <recording_id>_<start>_<end> where start and end are integers
+    # and start < end (to distinguish from timestamp-like recording IDs)
     parts = clip_stem.rsplit('_', 2)
     
     if len(parts) == 3:
         # Check if last two parts are numeric (start and end seconds)
         try:
-            int(parts[-1])  # end
-            int(parts[-2])  # start
-            # This is the new format, return everything before the last two underscores
-            return parts[0]
+            end_sec = int(parts[-1])
+            start_sec = int(parts[-2])
+            # Validate that this looks like a time range (start < end)
+            # This helps avoid misinterpreting timestamps in recording IDs
+            if start_sec < end_sec:
+                # This is the new format, return everything before the last two underscores
+                return parts[0]
         except ValueError:
             pass
     
