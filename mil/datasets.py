@@ -39,17 +39,24 @@ def load_embeddings_npz(npz_path: str | Path) -> Tuple[np.ndarray, np.ndarray, n
     return embeddings, start_sec, end_sec
 
 
-def parse_strong_labels(txt_path: str | Path) -> List[Tuple[float, float, str]]:
+def parse_strong_labels(txt_path: str | Path) -> List[Tuple[float, float, str, str]]:
     """
     Parse AnuraSet strong label file.
     
-    Format: Each line contains "<start_sec> <end_sec> <species> [quality]"
+    Format: Each line contains "<start_sec> <end_sec> <species_quality>"
+    where <species_quality> is formatted as "<species>_<quality>" with quality
+    being one of L (low), M (medium), or H (high).
+    
+    Examples:
+        "0.5 2.3 Boana_faber_H" -> (0.5, 2.3, "Boana_faber", "H")
+        "1.0 3.5 Dendropsophus_minutus_M" -> (1.0, 3.5, "Dendropsophus_minutus", "M")
     
     Args:
         txt_path: Path to strong label .txt file.
         
     Returns:
-        List of (start_sec, end_sec, species) tuples.
+        List of (start_sec, end_sec, species, quality) tuples where quality
+        is one of 'L', 'M', 'H' or empty string if not present.
     """
     events = []
     txt_path = Path(txt_path)
@@ -68,13 +75,53 @@ def parse_strong_labels(txt_path: str | Path) -> List[Tuple[float, float, str]]:
             try:
                 start = float(parts[0])
                 end = float(parts[1])
-                species = parts[2]
-                events.append((start, end, species))
+                species_quality = parts[2]
+                
+                # Parse species_quality format: <species>_<quality>
+                # Quality is the last character after the last underscore (L, M, or H)
+                species, quality = parse_species_quality(species_quality)
+                events.append((start, end, species, quality))
             except ValueError:
                 logger.warning(f"Failed to parse line in {txt_path}: {line}")
                 continue
     
     return events
+
+
+def parse_species_quality(species_quality: str) -> Tuple[str, str]:
+    """
+    Parse species_quality string into species and quality components.
+    
+    Format: "<species>_<quality>" where quality is one of L, M, H.
+    If the last part after underscore is not a valid quality indicator,
+    the entire string is treated as the species name.
+    
+    Args:
+        species_quality: Combined species and quality string (e.g., "Boana_faber_H")
+        
+    Returns:
+        Tuple of (species, quality) where quality is 'L', 'M', 'H', or ''
+        
+    Examples:
+        "Boana_faber_H" -> ("Boana_faber", "H")
+        "Dendropsophus_minutus_M" -> ("Dendropsophus_minutus", "M")
+        "Species_name" -> ("Species_name", "")
+    """
+    valid_qualities = {'L', 'M', 'H'}
+    
+    if '_' not in species_quality:
+        return species_quality, ''
+    
+    # Split from the right to get the last part
+    last_underscore_idx = species_quality.rfind('_')
+    potential_quality = species_quality[last_underscore_idx + 1:]
+    
+    if potential_quality in valid_qualities:
+        species = species_quality[:last_underscore_idx]
+        return species, potential_quality
+    else:
+        # Not a valid quality, treat entire string as species
+        return species_quality, ''
 
 
 def build_label_index(
@@ -103,7 +150,7 @@ def build_label_index(
         # Scan all .txt files for species names
         for txt_path in strong_root.glob("**/*.txt"):
             events = parse_strong_labels(txt_path)
-            for _, _, species in events:
+            for _, _, species, _ in events:  # Now unpacking 4 elements
                 all_species.add(species)
         
         all_species = sorted(all_species)
@@ -115,7 +162,7 @@ def build_label_index(
 
 
 def events_to_labels(
-    events: List[Tuple[float, float, str]],
+    events: List[Tuple[float, float, str, str]],
     label_index: Dict[str, int],
     start_sec: np.ndarray,
     end_sec: np.ndarray,
@@ -127,7 +174,7 @@ def events_to_labels(
     overlaps with the chunk's time interval.
     
     Args:
-        events: List of (start, end, species) tuples.
+        events: List of (start, end, species, quality) tuples.
         label_index: Mapping from species to class index.
         start_sec: (T,) array of chunk start times.
         end_sec: (T,) array of chunk end times.
@@ -143,7 +190,7 @@ def events_to_labels(
     weak_labels = np.zeros((C,), dtype=np.float32)
     time_labels = np.zeros((T, C), dtype=np.float32)
     
-    for start, end, species in events:
+    for start, end, species, quality in events:  # Now unpacking 4 elements
         if species not in label_index:
             continue
         
@@ -158,6 +205,45 @@ def events_to_labels(
     return weak_labels, time_labels
 
 
+def extract_recording_id(clip_stem: str) -> str:
+    """
+    Extract recording ID from clip filename stem.
+    
+    Handles two filename formats:
+    1. New format: "INCT17_20200211_041500_7_10" -> "INCT17_20200211_041500" (removes _startSec_endSec suffix)
+    2. Old format: "INCT17_20200211_041500" -> "INCT17_20200211_041500" (no change)
+    
+    The recording ID can contain underscores. The last two underscore-separated
+    values are the clip start and end times in seconds.
+    
+    Args:
+        clip_stem: Filename stem of the clip (e.g., "INCT17_20200211_041500_7_10")
+        
+    Returns:
+        Recording ID without clip time suffix (e.g., "INCT17_20200211_041500")
+    """
+    # Try to detect if this is the new format with _start_end suffix
+    # Pattern: <recording_id>_<start>_<end> where start and end are integers
+    # and start < end (to distinguish from timestamp-like recording IDs)
+    parts = clip_stem.rsplit('_', 2)
+    
+    if len(parts) == 3:
+        # Check if last two parts are numeric (start and end seconds)
+        try:
+            end_sec = int(parts[-1])
+            start_sec = int(parts[-2])
+            # Validate that this looks like a time range (start < end)
+            # This helps avoid misinterpreting timestamps in recording IDs
+            if start_sec < end_sec:
+                # This is the new format, return everything before the last two underscores
+                return parts[0]
+        except ValueError:
+            pass
+    
+    # Not in new format or couldn't parse, return as-is
+    return clip_stem
+
+
 def _find_strong_label_file(
     npz_path: Path,
     strong_root: Path,
@@ -165,9 +251,13 @@ def _find_strong_label_file(
     """
     Find matching strong label file for an embedding file.
     
+    Handles both old and new filename formats:
+    - New format: embeddings/SITE_A/REC_000001_0_3.embeddings.npz -> strong_labels/SITE_A/REC_000001.txt
+    - Old format: embeddings/SITE_A/REC_000001.embeddings.npz -> strong_labels/SITE_A/REC_000001.txt
+    
     Tries several strategies:
-    1. Same stem with .txt extension in corresponding subdirectory
-    2. Direct stem match in any subdirectory
+    1. Same recording ID with .txt extension in corresponding subdirectory
+    2. Direct recording ID match in any subdirectory
     
     Args:
         npz_path: Path to .embeddings.npz file.
@@ -181,24 +271,27 @@ def _find_strong_label_file(
     if stem.endswith(".embeddings"):
         stem = stem[:-11]  # Remove ".embeddings"
     
+    # Extract recording ID (handles both old and new formats)
+    recording_id = extract_recording_id(stem)
+    
     # Try to preserve directory structure
-    # e.g., embeddings/SITE_A/REC_001.embeddings.npz -> strong_labels/SITE_A/REC_001.txt
+    # e.g., embeddings/SITE_A/REC_001_0_3.embeddings.npz -> strong_labels/SITE_A/REC_001.txt
     try:
         # Check if parent directory matches a site
         site_dir = npz_path.parent.name
-        candidate = strong_root / site_dir / f"{stem}.txt"
+        candidate = strong_root / site_dir / f"{recording_id}.txt"
         if candidate.exists():
             return candidate
     except Exception:
         pass
     
     # Try direct match
-    candidate = strong_root / f"{stem}.txt"
+    candidate = strong_root / f"{recording_id}.txt"
     if candidate.exists():
         return candidate
     
     # Search all subdirectories
-    for txt_path in strong_root.glob(f"**/{stem}.txt"):
+    for txt_path in strong_root.glob(f"**/{recording_id}.txt"):
         return txt_path
     
     return None
