@@ -6,10 +6,14 @@ Usage:
     # Train all poolers with default settings
     python scripts/train_mil.py --emb_dir /data/embeddings --strong_root /data/anuraset/strong_labels
 
-    # Train specific poolers with W&B logging
+    # Train specific poolers with W&B logging and seed for reproducibility
     python scripts/train_mil.py --emb_dir /data/embeddings --strong_root /data/anuraset/strong_labels \
         --poolers lme attn autopool --epochs 20 --batch_size 32 \
-        --wandb --wandb_project bird-mil
+        --wandb --wandb_project bird-mil --seed 42
+
+    # Save checkpoints every 5 epochs with custom output directory
+    python scripts/train_mil.py --emb_dir /data/embeddings --strong_root /data/anuraset/strong_labels \
+        --poolers attn --epochs 50 --save_every 5 --out_dir ./experiments
 
     # Use custom species list
     python scripts/train_mil.py --emb_dir /data/embeddings --strong_root /data/anuraset/strong_labels \
