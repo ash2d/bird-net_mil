@@ -71,8 +71,9 @@ def train_epoch(
     n_samples = 0
     
     for embeddings, weak_labels, _, _ in loader:
-        embeddings = embeddings.to(device)
-        weak_labels = weak_labels.to(device)
+
+        embeddings = embeddings.to(device, non_blocking=True)
+        weak_labels = weak_labels.to(device, non_blocking=True)
         
         optimizer.zero_grad()
         y_clip, _ = head(embeddings)

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -34,6 +35,8 @@ from mil.heads import PoolingHead, POOLER_NAMES
 from mil.datasets import EmbeddingBagDataset, collate_fn, build_label_index
 from mil.train import Trainer
 from mil.evaluate import pointing_game
+import glob
+import random
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -81,6 +84,10 @@ def main() -> int:
     data_group.add_argument(
         "--species_list", type=str, default=None,
         help="Path to text file with species names (one per line)",
+    )
+    data_group.add_argument(
+    "--small_train", type=float, default=None,
+    help="Fraction or count of training data to use (e.g., 0.1 for 10% or 100 for 100 samples)",
     )
     data_group.add_argument(
         "--val_split", type=float, default=0.1,
@@ -178,6 +185,28 @@ def main() -> int:
             npz_pattern = args.emb_glob
         else:
             npz_pattern = str(Path(args.emb_dir) / "**/*.embeddings.npz")
+
+        if args.small_train:
+            logger.info("Using small training set for quick testing")
+            all_paths = sorted(glob.glob(npz_pattern, recursive=True))
+            if not all_paths:
+                raise FileNotFoundError(f"No .npz files found for pattern: {npz_pattern}")
+
+            n_total = len(all_paths)
+            if args.small_train <= 0:
+                raise ValueError("small_train must be > 0")
+
+            # If small_train < 1 treat as fraction, otherwise treat as count
+            if args.small_train < 1:
+                k = max(1, int(n_total * args.small_train))
+            else:
+                k = int(min(n_total, args.small_train))
+
+            random.seed(0)
+            selected_paths = random.sample(all_paths, k) if k < n_total else list(all_paths)
+
+            npz_pattern = selected_paths
+            logger.info(f"Using {len(selected_paths)}/{n_total} npz files for small_train ({args.small_train})")
         
         # Create dataset
         logger.info("Loading dataset...")
@@ -201,12 +230,16 @@ def main() -> int:
             val_dataset = None
         
         # Create data loaders
+        num_workers = max(1, int(os.environ.get("SLURM_CPUS_PER_TASK", "8")) - 1)
         train_loader = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
             shuffle=True,
             collate_fn=collate_fn,
-            num_workers=0,
+            num_workers=num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+            prefetch_factor=2,
         )
         
         val_loader = None
@@ -216,7 +249,10 @@ def main() -> int:
                 batch_size=args.batch_size,
                 shuffle=False,
                 collate_fn=collate_fn,
-                num_workers=0,
+                num_workers=num_workers,
+                pin_memory=True,
+                persistent_workers=True,
+                prefetch_factor=2,
             )
         
         # Train each pooler
