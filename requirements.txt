@@ -6,3 +6,4 @@ scipy>=1.10
 pandas>=2.0
 matplotlib>=3.7
 streamlit>=1.32
+scikit-learn>=1.3
