@@ -42,6 +42,17 @@ from mil.train import load_checkpoint
 from mil.evaluate import pointing_game
 
 
+def load_species_list(path: str | Path) -> list:
+    """Load species list from text file (one species per line)."""
+    species = []
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                species.append(line)
+    return species
+
+
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -242,7 +253,6 @@ def main() -> int:
         # Build label index (must match training)
         logger.info("Building label index...")
         if args.species_list:
-            from scripts.train_mil import load_species_list
             species_list = load_species_list(args.species_list)
             label_index = build_label_index(species_list=species_list)
         else:

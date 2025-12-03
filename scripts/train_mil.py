@@ -46,7 +46,12 @@ import random
 
 
 def set_seed(seed: int) -> None:
-    """Set random seed for reproducibility."""
+    """
+    Set random seed for reproducibility.
+    
+    Note: Setting deterministic=True and benchmark=False can impact performance.
+    These settings ensure reproducibility but may slow down training.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -243,6 +248,10 @@ def main() -> int:
             else:
                 k = int(min(n_total, args.small_train))
 
+            # Use deterministic sampling for consistency
+            # Note: Global seed (if set) takes precedence
+            if args.seed is None:
+                random.seed(0)  # Default seed for small_train sampling
             selected_paths = random.sample(all_paths, k) if k < n_total else list(all_paths)
 
             npz_pattern = selected_paths
