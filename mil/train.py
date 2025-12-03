@@ -194,6 +194,8 @@ class Trainer:
         use_wandb: bool = False,
         wandb_project: str = "bird-mil",
         wandb_entity: Optional[str] = None,
+        wandb_run_id: Optional[str] = None,
+        wandb_group: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
     ):
         """
@@ -209,6 +211,8 @@ class Trainer:
             use_wandb: Whether to use Weights & Biases logging.
             wandb_project: W&B project name.
             wandb_entity: W&B entity/team name.
+            wandb_run_id: W&B run ID for grouping multiple heads.
+            wandb_group: W&B group name for organizing runs.
             wandb_config: Additional config to log to W&B.
         """
         self.head = head.to(device)
@@ -241,13 +245,23 @@ class Trainer:
                         **(wandb_config or {}),
                     }
                     
-                    self.wandb_run = wandb.init(
-                        project=wandb_project,
-                        entity=wandb_entity,
-                        config=config,
-                        name=f"{head.pool_name}",
-                        reinit=True,
-                    )
+                    # Use group and run_id for better organization
+                    wandb_kwargs = {
+                        "project": wandb_project,
+                        "entity": wandb_entity,
+                        "config": config,
+                        "name": f"{head.pool_name}",
+                        "reinit": True,
+                    }
+                    
+                    if wandb_group:
+                        wandb_kwargs["group"] = wandb_group
+                    
+                    if wandb_run_id:
+                        # Use tags to associate with run_id
+                        wandb_kwargs["tags"] = [wandb_run_id]
+                    
+                    self.wandb_run = wandb.init(**wandb_kwargs)
                     logger.info(f"W&B run initialized: {self.wandb_run.name}")
                 except Exception as e:
                     logger.warning(f"Failed to initialize W&B: {e}")

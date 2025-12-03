@@ -24,8 +24,10 @@ import os
 import sys
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 
 import torch
+import numpy as np
 from torch.utils.data import DataLoader, random_split
 
 # Add parent directory to path for imports
@@ -37,6 +39,17 @@ from mil.train import Trainer
 from mil.evaluate import pointing_game
 import glob
 import random
+
+
+def set_seed(seed: int) -> None:
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # For deterministic behavior (may impact performance)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -129,6 +142,10 @@ def main() -> int:
         "--out_dir", type=str, default="runs",
         help="Output directory for checkpoints and logs (default: runs)",
     )
+    output_group.add_argument(
+        "--save_every", type=int, default=0,
+        help="Save checkpoint every N epochs (0 to disable, default: 0)",
+    )
     
     # W&B arguments
     wandb_group = parser.add_argument_group("Weights & Biases")
@@ -154,11 +171,31 @@ def main() -> int:
         "--eval_pointing", action="store_true",
         help="Evaluate pointing game after training",
     )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="Random seed for reproducibility (default: None)",
+    )
     
     args = parser.parse_args()
     setup_logging(args.verbose)
     
     logger = logging.getLogger(__name__)
+    
+    # Set random seed if specified
+    if args.seed is not None:
+        logger.info(f"Setting random seed to {args.seed}")
+        set_seed(args.seed)
+    
+    # Create run ID and output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = f"run_{timestamp}"
+    if args.seed is not None:
+        run_id += f"_seed{args.seed}"
+    
+    run_dir = Path(args.out_dir) / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Run ID: {run_id}")
+    logger.info(f"Output directory: {run_dir}")
     
     # Validate arguments
     if args.emb_dir is None and args.emb_glob is None:
@@ -202,7 +239,6 @@ def main() -> int:
             else:
                 k = int(min(n_total, args.small_train))
 
-            random.seed(0)
             selected_paths = random.sample(all_paths, k) if k < n_total else list(all_paths)
 
             npz_pattern = selected_paths
@@ -277,21 +313,26 @@ def main() -> int:
                 val_loader=val_loader,
                 lr=args.lr,
                 device=device,
-                out_dir=args.out_dir,
+                out_dir=run_dir,
                 use_wandb=args.wandb,
                 wandb_project=args.wandb_project,
                 wandb_entity=args.wandb_entity,
+                wandb_run_id=run_id,
+                wandb_group=run_id,
                 wandb_config={
                     "epochs": args.epochs,
                     "batch_size": args.batch_size,
                     "n_samples": len(dataset),
                     "val_split": args.val_split,
+                    "seed": args.seed,
+                    "run_id": run_id,
                 },
             )
             
             # Train
             losses = trainer.train(
                 epochs=args.epochs,
+                save_every=args.save_every,
                 early_stop_patience=args.early_stop,
             )
             
