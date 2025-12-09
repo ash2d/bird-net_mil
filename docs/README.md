@@ -1,5 +1,3 @@
-<div align="center"><img width="300" alt="BirdNET+ logo" src="img/logo-birdnet-circle.png"></div>
-
 # birdnet-V3.0-dev + MIL Pooling Heads
 
 CLI to analyze audio with BirdNET+ V3.0 developer preview models, export per-chunk detections, and train/evaluate Multiple Instance Learning (MIL) pooling heads for bioacoustic classification.
@@ -49,8 +47,7 @@ This option requires you have an NVIDIA GPU with CUDA installed and visible to t
 ```bash
 nvidia-smi
 ```
-You should see a table showing information about your CUDA version and running processes:
-![alt text](image.png)
+You should see a table showing information about your CUDA version and running processes.
 
 If you do, then you can install a CUDA-enabled version of pyTorch:
 
@@ -106,9 +103,6 @@ embeddings, predictions = model(input)
 ## Streamlit web app
 
 For quick experimentation, we provide an interactive UI to upload audio, view a spectrogram, run the model, and visualize results.
-
-![Streamlit app screenshot](img/streamlit-ui-screenshot.png)
-
 
 ### Start the app
 ```bash
