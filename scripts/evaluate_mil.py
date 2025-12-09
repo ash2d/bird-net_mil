@@ -16,11 +16,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any
+import random
 
 import numpy as np
 import torch
@@ -200,6 +202,10 @@ def main() -> int:
         "--species_list", type=str, default=None,
         help="Path to text file with species names (one per line)",
     )
+    data_group.add_argument(
+        "--small_test", type=float, default=None,
+        help="Fraction or count of test data to use (e.g., 0.1 for 10% or 100 for 100 samples)",
+    )
     
     # Evaluation arguments
     eval_group = parser.add_argument_group("Evaluation")
@@ -271,6 +277,31 @@ def main() -> int:
         else:
             npz_pattern = str(Path(args.emb_dir) / "**/*.embeddings.npz")
         
+        if args.small_test:
+            logger.info("Using small test set for quick testing")
+            all_paths = sorted(glob.glob(npz_pattern, recursive=True))
+            if not all_paths:
+                raise FileNotFoundError(f"No .npz files found for pattern: {npz_pattern}")
+
+            n_total = len(all_paths)
+            if args.small_train <= 0:
+                raise ValueError("small_train must be > 0")
+
+            # If small_train < 1 treat as fraction, otherwise treat as count
+            if args.small_train < 1:
+                k = max(1, int(n_total * args.small_train))
+            else:
+                k = int(min(n_total, args.small_train))
+
+            # Use deterministic sampling for consistency
+            # Note: Global seed (if set) takes precedence
+            if args.seed is None:
+                random.seed(0)  # Default seed for small_train sampling
+            selected_paths = random.sample(all_paths, k) if k < n_total else list(all_paths)
+
+            npz_pattern = selected_paths
+            logger.info(f"Using {len(selected_paths)}/{n_total} npz files for small_train ({args.small_train})")
+
         # Create dataset
         logger.info("Loading dataset...")
         dataset = EmbeddingBagDataset(
