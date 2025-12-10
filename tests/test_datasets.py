@@ -2,6 +2,7 @@
 
 import pytest
 import numpy as np
+import pandas as pd
 import sys
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from mil.datasets import (
     _find_strong_label_file,
     events_to_labels,
     build_label_index,
+    load_weak_labels_csv,
+    extract_species_from_weak_csv,
+    get_weak_labels_for_recording,
 )
 
 
@@ -292,6 +296,110 @@ class TestBuildLabelIndex:
         assert label_index["Species_A"] == 0
         assert label_index["Species_B"] == 1
         assert label_index["Species_C"] == 2
+
+
+class TestWeakLabels:
+    """Test weak label CSV loading and processing."""
+    
+    def test_load_weak_labels_csv(self, tmp_path):
+        """Test loading weak labels from CSV."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana_faber,SPECIES_Dendropsophus_minutus
+SITE_A,REC_001,1,0
+SITE_A,REC_002,0,1
+SITE_B,REC_003,1,1
+"""
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        
+        assert len(df) == 3
+        assert "MONITORING_SITE" in df.columns
+        assert "AUDIO_FILE_ID" in df.columns
+        assert "SPECIES_Boana_faber" in df.columns
+        assert "SPECIES_Dendropsophus_minutus" in df.columns
+    
+    def test_load_weak_labels_csv_missing_columns(self, tmp_path):
+        """Test loading CSV with missing required columns."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """SITE,FILE,SPECIES_Boana_faber
+SITE_A,REC_001,1
+"""
+        csv_file.write_text(csv_content)
+        
+        with pytest.raises(ValueError):
+            load_weak_labels_csv(csv_file)
+    
+    def test_extract_species_from_weak_csv(self, tmp_path):
+        """Test extracting species names from CSV columns."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana_faber,SPECIES_Dendropsophus_minutus,SPECIES_Scinax_fuscovarius
+SITE_A,REC_001,1,0,1
+"""
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        species = extract_species_from_weak_csv(df)
+        
+        assert len(species) == 3
+        assert "Boana_faber" in species
+        assert "Dendropsophus_minutus" in species
+        assert "Scinax_fuscovarius" in species
+        # Should be sorted
+        assert species == sorted(species)
+    
+    def test_get_weak_labels_for_recording_found(self, tmp_path):
+        """Test getting weak labels for a recording that exists."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana_faber,SPECIES_Dendropsophus_minutus
+SITE_A,REC_001,1,0
+SITE_A,REC_002,0,1
+"""
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        label_index = {"Boana_faber": 0, "Dendropsophus_minutus": 1}
+        
+        labels = get_weak_labels_for_recording(df, "REC_001", label_index)
+        
+        assert labels[0] == 1.0  # Boana_faber
+        assert labels[1] == 0.0  # Dendropsophus_minutus
+    
+    def test_get_weak_labels_for_recording_not_found(self, tmp_path):
+        """Test getting weak labels for a recording that doesn't exist."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana_faber
+SITE_A,REC_001,1
+"""
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        label_index = {"Boana_faber": 0}
+        
+        labels = get_weak_labels_for_recording(df, "REC_999", label_index)
+        
+        # Should return all zeros
+        assert labels[0] == 0.0
+    
+    def test_build_label_index_from_weak_csv(self, tmp_path):
+        """Test building label index from weak CSV."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana_faber,SPECIES_Dendropsophus_minutus,SPECIES_Scinax_fuscovarius
+SITE_A,REC_001,1,0,1
+"""
+        csv_file.write_text(csv_content)
+        
+        label_index = build_label_index(weak_csv=csv_file)
+        
+        assert len(label_index) == 3
+        assert "Boana_faber" in label_index
+        assert "Dendropsophus_minutus" in label_index
+        assert "Scinax_fuscovarius" in label_index
+        # Should be sorted
+        assert label_index["Boana_faber"] == 0
+        assert label_index["Dendropsophus_minutus"] == 1
+        assert label_index["Scinax_fuscovarius"] == 2
+
 
 
 if __name__ == "__main__":

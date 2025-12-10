@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
@@ -124,25 +125,115 @@ def parse_species_quality(species_quality: str) -> Tuple[str, str]:
         return species_quality, ''
 
 
+def load_weak_labels_csv(csv_path: str | Path) -> pd.DataFrame:
+    """
+    Load weak labels from CSV file.
+    
+    CSV format should have columns:
+    - 'MONITORING_SITE': Site identifier
+    - 'AUDIO_FILE_ID': Audio filename (without path, without _<start>_<end> suffix)
+    - 'SPECIES_<species_name>': Binary columns (0 or 1) for each species
+    
+    Args:
+        csv_path: Path to weak label CSV file.
+        
+    Returns:
+        DataFrame with weak labels.
+    """
+    df = pd.read_csv(csv_path)
+    
+    # Validate required columns
+    if 'MONITORING_SITE' not in df.columns:
+        raise ValueError("CSV must have 'MONITORING_SITE' column")
+    if 'AUDIO_FILE_ID' not in df.columns:
+        raise ValueError("CSV must have 'AUDIO_FILE_ID' column")
+    
+    return df
+
+
+def extract_species_from_weak_csv(df: pd.DataFrame) -> List[str]:
+    """
+    Extract species names from weak label CSV columns.
+    
+    Args:
+        df: DataFrame with weak labels.
+        
+    Returns:
+        List of species names (sorted).
+    """
+    species = []
+    for col in df.columns:
+        if col.startswith('SPECIES_'):
+            species_name = col[8:]  # Remove 'SPECIES_' prefix
+            species.append(species_name)
+    
+    return sorted(species)
+
+
+def get_weak_labels_for_recording(
+    df: pd.DataFrame,
+    audio_file_id: str,
+    label_index: Dict[str, int],
+) -> np.ndarray:
+    """
+    Get weak labels for a specific recording from the weak label DataFrame.
+    
+    Args:
+        df: DataFrame with weak labels.
+        audio_file_id: Audio file ID (without path, without _<start>_<end> suffix).
+        label_index: Mapping from species to class index.
+        
+    Returns:
+        (C,) binary array of weak labels, or all zeros if recording not found.
+    """
+    C = len(label_index)
+    weak_labels = np.zeros((C,), dtype=np.float32)
+    
+    # Find matching row
+    matching_rows = df[df['AUDIO_FILE_ID'] == audio_file_id]
+    
+    if len(matching_rows) == 0:
+        return weak_labels
+    
+    # Use first matching row (should be only one)
+    row = matching_rows.iloc[0]
+    
+    # Fill in species labels
+    for species, idx in label_index.items():
+        col_name = f'SPECIES_{species}'
+        if col_name in row:
+            weak_labels[idx] = float(row[col_name])
+    
+    return weak_labels
+
+
 def build_label_index(
     strong_root: str | Path | None = None,
     species_list: List[str] | None = None,
+    weak_csv: str | Path | None = None,
 ) -> Dict[str, int]:
     """
     Build a mapping from species names to class indices.
     
-    Either scans strong label directory to discover all species,
-    or uses a provided species list.
+    Can build from:
+    - Explicit species list
+    - Strong label directory (scans all .txt files)
+    - Weak label CSV file (extracts SPECIES_* columns)
     
     Args:
         strong_root: Root directory containing strong label .txt files.
         species_list: Optional explicit list of species to include.
+        weak_csv: Optional path to weak label CSV file.
         
     Returns:
         Dictionary mapping species name to class index.
     """
     if species_list is not None:
         all_species = sorted(set(species_list))
+    elif weak_csv is not None:
+        df = load_weak_labels_csv(weak_csv)
+        all_species = extract_species_from_weak_csv(df)
+        logger.info(f"Found {len(all_species)} species in weak labels CSV")
     elif strong_root is not None:
         strong_root = Path(strong_root)
         all_species = set()
@@ -156,7 +247,7 @@ def build_label_index(
         all_species = sorted(all_species)
         logger.info(f"Found {len(all_species)} species in strong labels")
     else:
-        raise ValueError("Must provide either strong_root or species_list")
+        raise ValueError("Must provide either strong_root, species_list, or weak_csv")
     
     return {sp: i for i, sp in enumerate(all_species)}
 
@@ -244,6 +335,24 @@ def extract_recording_id(clip_stem: str) -> str:
     return clip_stem
 
 
+def extract_recording_id_from_path(npz_path: Path) -> str:
+    """
+    Extract recording ID from NPZ path.
+    
+    Removes .embeddings suffix and extracts base recording ID.
+    
+    Args:
+        npz_path: Path to .embeddings.npz file.
+        
+    Returns:
+        Recording ID without clip time suffix.
+    """
+    stem = npz_path.stem
+    if stem.endswith(".embeddings"):
+        stem = stem[:-11]  # Remove ".embeddings"
+    return extract_recording_id(stem)
+
+
 def _find_strong_label_file(
     npz_path: Path,
     strong_root: Path,
@@ -266,13 +375,8 @@ def _find_strong_label_file(
     Returns:
         Path to matching .txt file or None if not found.
     """
-    # Get stem without .embeddings suffix
-    stem = npz_path.stem
-    if stem.endswith(".embeddings"):
-        stem = stem[:-11]  # Remove ".embeddings"
-    
     # Extract recording ID (handles both old and new formats)
-    recording_id = extract_recording_id(stem)
+    recording_id = extract_recording_id_from_path(npz_path)
     
     # Try to preserve directory structure
     # e.g., embeddings/SITE_A/REC_001_0_3.embeddings.npz -> strong_labels/SITE_A/REC_001.txt
@@ -311,17 +415,19 @@ class EmbeddingBagDataset(Dataset):
         strong_root: str | Path | None = None,
         label_index: Dict[str, int] | None = None,
         species_list: List[str] | None = None,
+        weak_csv: str | Path | None = None,
     ):
         """
         Initialize dataset.
         
         Args:
             npz_paths: List of paths to .embeddings.npz files, or glob pattern.
-            strong_root: Root directory of strong label files.
-            label_index: Pre-built label index. If None, will build from strong_root.
+            strong_root: Root directory of strong label files (for strong labels).
+            label_index: Pre-built label index. If None, will build from available sources.
             species_list: Optional species list for building label index.
+            weak_csv: Optional path to weak label CSV file.
         """
-        # Handle glob pattern
+        # Handle glob pattern or list of paths
         if isinstance(npz_paths, str):
             self.npz_paths = [Path(p) for p in sorted(glob.glob(npz_paths))]
         else:
@@ -331,20 +437,29 @@ class EmbeddingBagDataset(Dataset):
             raise ValueError("No .npz files found")
         
         self.strong_root = Path(strong_root) if strong_root else None
+        self.weak_csv_path = Path(weak_csv) if weak_csv else None
+        
+        # Load weak labels CSV if provided
+        self.weak_labels_df = None
+        if self.weak_csv_path:
+            self.weak_labels_df = load_weak_labels_csv(self.weak_csv_path)
+            logger.info(f"Loaded weak labels from {self.weak_csv_path}")
         
         # Build or use provided label index
         if label_index is not None:
             self.label_index = label_index
         elif species_list is not None:
             self.label_index = build_label_index(species_list=species_list)
+        elif weak_csv is not None:
+            self.label_index = build_label_index(weak_csv=weak_csv)
         elif strong_root is not None:
             self.label_index = build_label_index(strong_root=strong_root)
         else:
-            raise ValueError("Must provide label_index, species_list, or strong_root")
+            raise ValueError("Must provide label_index, species_list, weak_csv, or strong_root")
         
         self.n_classes = len(self.label_index)
         
-        # Build mapping from npz to strong label files
+        # Build mapping from npz to strong label files (if using strong labels)
         self.strong_paths: Dict[int, Optional[Path]] = {}
         if self.strong_root:
             for i, npz_path in enumerate(self.npz_paths):
@@ -374,16 +489,35 @@ class EmbeddingBagDataset(Dataset):
         # Load embeddings
         embeddings, start_sec, end_sec = load_embeddings_npz(npz_path)
         
-        # Load and convert strong labels
-        strong_path = self.strong_paths.get(idx)
-        if strong_path and strong_path.exists():
-            events = parse_strong_labels(strong_path)
-        else:
-            events = []
+        # Initialize labels
+        T = len(start_sec)
+        C = self.n_classes
+        weak_labels = np.zeros((C,), dtype=np.float32)
+        time_labels = np.zeros((T, C), dtype=np.float32)
         
-        weak_labels, time_labels = events_to_labels(
-            events, self.label_index, start_sec, end_sec
-        )
+        # Try to load weak labels from CSV first
+        if self.weak_labels_df is not None:
+            # Extract recording ID from npz path
+            recording_id = extract_recording_id_from_path(npz_path)
+            
+            # Get weak labels for this recording
+            weak_labels = get_weak_labels_for_recording(
+                self.weak_labels_df,
+                recording_id,
+                self.label_index,
+            )
+            # For weak labels, we don't have time-level labels, keep them as zeros
+        else:
+            # Fall back to strong labels
+            strong_path = self.strong_paths.get(idx)
+            if strong_path and strong_path.exists():
+                events = parse_strong_labels(strong_path)
+            else:
+                events = []
+            
+            weak_labels, time_labels = events_to_labels(
+                events, self.label_index, start_sec, end_sec
+            )
         
         return (
             torch.from_numpy(embeddings),
