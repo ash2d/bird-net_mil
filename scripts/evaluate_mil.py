@@ -192,11 +192,15 @@ def main() -> int:
     )
     data_group.add_argument(
         "--emb_glob", type=str, default=None,
-        help="Glob pattern for finding .npz files (alternative to --emb_dir)",
+        help="Glob pattern for finding .npz files, or path to text file with paths (one per line, alternative to --emb_dir)",
     )
     data_group.add_argument(
-        "--strong_root", type=str, required=True,
+        "--strong_root", type=str, default=None,
         help="Root directory containing strong label .txt files",
+    )
+    data_group.add_argument(
+        "--weak_csv", type=str, default=None,
+        help="Path to weak label CSV file (alternative to strong labels)",
     )
     data_group.add_argument(
         "--species_list", type=str, default=None,
@@ -246,6 +250,9 @@ def main() -> int:
     if args.emb_dir is None and args.emb_glob is None:
         parser.error("Must specify either --emb_dir or --emb_glob")
     
+    if args.strong_root is None and args.weak_csv is None:
+        parser.error("Must specify either --strong_root or --weak_csv")
+    
     # Resolve device
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -261,6 +268,8 @@ def main() -> int:
         if args.species_list:
             species_list = load_species_list(args.species_list)
             label_index = build_label_index(species_list=species_list)
+        elif args.weak_csv:
+            label_index = build_label_index(weak_csv=args.weak_csv)
         else:
             label_index = build_label_index(strong_root=args.strong_root)
         
@@ -273,7 +282,16 @@ def main() -> int:
         
         # Find NPZ files
         if args.emb_glob:
-            npz_pattern = args.emb_glob
+            # Check if it's a file containing paths
+            emb_glob_path = Path(args.emb_glob)
+            if emb_glob_path.exists() and emb_glob_path.is_file():
+                # Read paths from file
+                logger.info(f"Reading paths from {args.emb_glob}")
+                with open(emb_glob_path, 'r') as f:
+                    npz_pattern = [line.strip() for line in f if line.strip()]
+            else:
+                # Use as glob pattern
+                npz_pattern = args.emb_glob
         else:
             npz_pattern = str(Path(args.emb_dir) / "**/*.embeddings.npz")
         
@@ -308,6 +326,7 @@ def main() -> int:
             npz_paths=npz_pattern,
             strong_root=args.strong_root,
             label_index=label_index,
+            weak_csv=args.weak_csv,
         )
         
         logger.info(f"Dataset: {len(dataset)} samples")
