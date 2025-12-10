@@ -93,6 +93,10 @@ def split_site_chronologically(
     Sorts paths alphabetically (assuming chronological ordering in filenames)
     and takes the last test_fraction for testing.
     
+    Note: Always includes at least 1 sample in the test set, even if test_fraction
+    would result in 0 samples. This ensures every site contributes to testing but
+    may not be ideal for sites with very few recordings (e.g., 1-2 files).
+    
     Args:
         paths: List of paths for a single site.
         test_fraction: Fraction of recordings to use for testing (default: 0.05).

@@ -335,6 +335,24 @@ def extract_recording_id(clip_stem: str) -> str:
     return clip_stem
 
 
+def extract_recording_id_from_path(npz_path: Path) -> str:
+    """
+    Extract recording ID from NPZ path.
+    
+    Removes .embeddings suffix and extracts base recording ID.
+    
+    Args:
+        npz_path: Path to .embeddings.npz file.
+        
+    Returns:
+        Recording ID without clip time suffix.
+    """
+    stem = npz_path.stem
+    if stem.endswith(".embeddings"):
+        stem = stem[:-11]  # Remove ".embeddings"
+    return extract_recording_id(stem)
+
+
 def _find_strong_label_file(
     npz_path: Path,
     strong_root: Path,
@@ -357,13 +375,8 @@ def _find_strong_label_file(
     Returns:
         Path to matching .txt file or None if not found.
     """
-    # Get stem without .embeddings suffix
-    stem = npz_path.stem
-    if stem.endswith(".embeddings"):
-        stem = stem[:-11]  # Remove ".embeddings"
-    
     # Extract recording ID (handles both old and new formats)
-    recording_id = extract_recording_id(stem)
+    recording_id = extract_recording_id_from_path(npz_path)
     
     # Try to preserve directory structure
     # e.g., embeddings/SITE_A/REC_001_0_3.embeddings.npz -> strong_labels/SITE_A/REC_001.txt
@@ -485,10 +498,7 @@ class EmbeddingBagDataset(Dataset):
         # Try to load weak labels from CSV first
         if self.weak_labels_df is not None:
             # Extract recording ID from npz path
-            stem = npz_path.stem
-            if stem.endswith(".embeddings"):
-                stem = stem[:-11]  # Remove ".embeddings"
-            recording_id = extract_recording_id(stem)
+            recording_id = extract_recording_id_from_path(npz_path)
             
             # Get weak labels for this recording
             weak_labels = get_weak_labels_for_recording(

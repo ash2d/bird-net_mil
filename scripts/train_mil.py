@@ -239,7 +239,7 @@ def main() -> int:
         if args.emb_glob:
             # Check if it's a file containing paths
             emb_glob_path = Path(args.emb_glob)
-            if emb_glob_path.exists() and emb_glob_path.is_file():
+            if emb_glob_path.is_file():
                 # Read paths from file
                 logger.info(f"Reading paths from {args.emb_glob}")
                 with open(emb_glob_path, 'r') as f:

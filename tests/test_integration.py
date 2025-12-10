@@ -96,10 +96,12 @@ def test_end_to_end_workflow():
         train_out = tmpdir / "train.txt"
         test_out = tmpdir / "test.txt"
         
+        script_path = Path(__file__).parent.parent / "scripts" / "create_train_test_split.py"
+        
         result = subprocess.run(
             [
                 sys.executable,
-                "scripts/create_train_test_split.py",
+                str(script_path),
                 "--emb_dir", str(emb_dir),
                 "--train_out", str(train_out),
                 "--test_out", str(test_out),
