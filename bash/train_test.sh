@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=embed_all
-#SBATCH --output=logs/embed_all%j/o.out
-#SBATCH --error=logs/embed_all%j/e.err
-#SBATCH --time=10:00:00
+#SBATCH --job-name=train_test
+#SBATCH --output=logs/train_test%j/o.out
+#SBATCH --error=logs/train_test%j/e.err
+#SBATCH --time=1:00:00
 #SBATCH --partition=orchid
 #SBATCH --account=orchid
 #SBATCH --qos=orchid
@@ -16,10 +16,9 @@
 # Navigate to your project directory
 cd /home/users/dash/guppies/embeddings/wildlife-tools
 
-mkdir -p logs
 # Activate the virtual environment
 source /home/users/dash/guppies/embeddings/wildlife-tools/.venv/bin/activate
 
 cd birdnet-V3.0-dev
 # Run your Python script with desired arguments
-srun uv run scripts/export_embeddings.py --wav_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio --out_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings_0_1 --chunk_length 0.1 --overlap 0.0
+srun uv run scripts/create_train_test_split.py --emb_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings_0_1 --train_out /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/train_0_1.txt --test_out /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt
