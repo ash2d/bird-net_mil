@@ -21,7 +21,10 @@ source /home/users/dash/guppies/embeddings/wildlife-tools/.venv/bin/activate
 
 cd birdnet-V3.0-dev
 # Run your Python script with desired arguments
-srun uv run scripts/train_mil.py     --emb_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels     --poolers lme attn linsoft  mean max     --epochs 20     --batch_size 32     --out_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs     --wandb     --wandb_project bird-mil
+srun uv run scripts/train_mil.py     --emb_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings   \
+  --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels --poolers lme attn linsoft  mean max    \
+   --epochs 20     --batch_size 32     --out_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs     --wandb     --wandb_project bird-mil --species_list /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/species_list.txt
+   
 srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_24_27.embeddings.npz     --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_REC_000001_Boana_faber.png     --wandb
 srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_26_29.embeddings.npz     --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_REC_000001_Boana_faber.png     --wandb
 srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_39_42.embeddings.npz     --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_REC_000001_Boana_faber.png     --wandb

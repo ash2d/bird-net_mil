@@ -174,6 +174,10 @@ def main() -> int:
         "--wandb_entity", type=str, default=None,
         help="W&B entity/team name",
     )
+    wandb_group.add_argument(
+        "--wandb_group", type=str, default=None,
+        help="W&B group ID for organizing runs",
+    )
     
     # Other arguments
     parser.add_argument(
@@ -252,7 +256,11 @@ def main() -> int:
 
         if args.small_train:
             logger.info("Using small training set for quick testing")
-            all_paths = sorted(glob.glob(npz_pattern, recursive=True))
+            # npz_pattern may be a glob pattern (str) or a pre-read list of paths (list)
+            if isinstance(npz_pattern, list):
+                all_paths = sorted(npz_pattern)
+            else:
+                all_paths = sorted(glob.glob(npz_pattern, recursive=True))
             if not all_paths:
                 raise FileNotFoundError(f"No .npz files found for pattern: {npz_pattern}")
 

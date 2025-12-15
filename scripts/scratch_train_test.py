@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Usage:
-    python replace_embeddings_prefix.py /path/to/list.txt NEW_PREFIX
+    python scratch_train_test.py /path/to/list.txt NEW_PREFIX
 
 This will produce /path/to/list_scratch.txt with updated paths.
 If a line does not contain 'embeddings_0_1' it will be left unchanged.
@@ -66,8 +66,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Replace prefix up to and including 'embeddings_0_1' with a provided variable."
     )
-    parser.add_argument("input_txt", type=Path, help="Path to the .txt file containing file paths (one per line).")
-    parser.add_argument("replacement", help="Replacement string (prefix) that will replace the folders up to and including 'embeddings_0_1'.")
+    parser.add_argument("--input_txt", type=Path, help="Path to the .txt file containing file paths (one per line).")
+    parser.add_argument("--replacement", help="Replacement string (prefix) that will replace the folders up to and including 'embeddings_0_1'.")
     args = parser.parse_args()
 
     process_file(args.input_txt, args.replacement)

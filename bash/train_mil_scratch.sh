@@ -32,11 +32,11 @@ cd birdnet-V3.0-dev
 mkdir -p logs
 
 # Run your Python script with desired arguments
-srun uv run scripts/train_mil.py     --emb_dir "/work/scratch-pw4/dash/55240785/emb"     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels  \
+srun uv run scripts/train_mil.py     --emb_dir "/work/scratch-pw4/dash/emb_1/emb"     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels  \
    --poolers lme attn linsoft mean max     --epochs 50     --batch_size 32     --out_dir /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs     --wandb   \
-     --wandb_project bird-mil-scratch-0_1 --val_split 0.1 --save_every 20 --seed 42 --small_train 1000
+     --wandb_project bird-mil-scratch-1 --val_split 0.1 --save_every 20 --seed 42  --species_list /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/species_list.txt
 
-
+# --small_train 1000
 # srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_24_27.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_24_27.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_24_27.png         --spectrogram    --wandb --wandb_project bird-mil-scratch
 # srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_26_29.embeddings.npz  --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_26_29.wav   --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_26_29.png           --spectrogram  --wandb --wandb_project bird-mil-scratch
 # srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_39_42.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_39_42.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_39_42.png          --spectrogram   --wandb --wandb_project bird-mil-scratch
