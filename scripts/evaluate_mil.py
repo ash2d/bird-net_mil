@@ -128,8 +128,8 @@ def evaluate_model(
     # Per-class metrics (micro and macro averaged)
     positive_counts = all_labels.sum(axis=0)
     pred_positive_counts = all_preds.sum(axis=0)
-    missing_positive_classes = [int(i) for i, c in enumerate(positive_counts) if c == 0]
-    zero_prediction_classes = [int(i) for i, c in enumerate(pred_positive_counts) if c == 0]
+    missing_positive_classes = np.where(positive_counts == 0)[0].tolist()
+    zero_prediction_classes = np.where(pred_positive_counts == 0)[0].tolist()
     
     if missing_positive_classes:
         logger.warning(
@@ -172,35 +172,30 @@ def evaluate_model(
         metrics["f1_macro"] = None
     
     # AUC-ROC (macro averaged)
-    auc_scores = []
-    for class_idx in range(all_labels.shape[1]):
-        y_true_cls = all_labels[:, class_idx]
-        y_prob_cls = all_probs[:, class_idx]
-        pos_count = y_true_cls.sum()
-        neg_count = len(y_true_cls) - pos_count
-        if pos_count == 0 or neg_count == 0:
-            continue
-        try:
-            auc_scores.append(roc_auc_score(y_true_cls, y_prob_cls))
-        except ValueError:
-            continue
+    def _per_class_scores(
+        scorer, require_negative: bool = False
+    ) -> list[float]:
+        scores = []
+        for class_idx in range(all_labels.shape[1]):
+            y_true_cls = all_labels[:, class_idx]
+            y_prob_cls = all_probs[:, class_idx]
+            pos_count = y_true_cls.sum()
+            neg_count = len(y_true_cls) - pos_count
+            if pos_count == 0 or (require_negative and neg_count == 0):
+                continue
+            try:
+                scores.append(scorer(y_true_cls, y_prob_cls))
+            except ValueError:
+                continue
+        return scores
+    
+    auc_scores = _per_class_scores(roc_auc_score, require_negative=True)
     metrics["auc_roc_macro"] = (
         float(np.mean(auc_scores)) if auc_scores else None
     )
     
     # Average Precision (macro averaged)
-    avg_precision_scores = []
-    for class_idx in range(all_labels.shape[1]):
-        y_true_cls = all_labels[:, class_idx]
-        y_prob_cls = all_probs[:, class_idx]
-        if y_true_cls.sum() == 0:
-            continue
-        try:
-            avg_precision_scores.append(
-                average_precision_score(y_true_cls, y_prob_cls)
-            )
-        except ValueError:
-            continue
+    avg_precision_scores = _per_class_scores(average_precision_score)
     metrics["avg_precision_macro"] = (
         float(np.mean(avg_precision_scores)) if avg_precision_scores else None
     )

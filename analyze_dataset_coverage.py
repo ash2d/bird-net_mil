@@ -127,11 +127,11 @@ def main() -> int:
     class_path = Path(args.class_names) if args.class_names else None
 
     if not train_path.exists():
-        raise FileNotFoundError(train_path)
+        raise FileNotFoundError(f"File not found: {train_path}")
     if not test_path.exists():
-        raise FileNotFoundError(test_path)
+        raise FileNotFoundError(f"File not found: {test_path}")
     if pred_path and not pred_path.exists():
-        raise FileNotFoundError(pred_path)
+        raise FileNotFoundError(f"File not found: {pred_path}")
 
     train_labels = binarize(load_array(train_path), args.threshold)
     test_labels = binarize(load_array(test_path), args.threshold)
