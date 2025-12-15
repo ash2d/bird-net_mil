@@ -25,49 +25,50 @@ source /home/users/dash/guppies/embeddings/wildlife-tools/.venv/bin/activate
 cd birdnet-V3.0-dev
 mkdir -p logs
 
+export gws_run_dir=/gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42
 
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_24_27.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_24_27.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_24_27.png         --spectrogram    --wandb --wandb_project bird-mil-scratch-0_1
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_26_29.embeddings.npz  --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_26_29.wav   --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_26_29.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_39_42.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_39_42.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_39_42.png          --spectrogram   --wandb --wandb_project bird-mil-scratch-0_1
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_41_44.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_41_44.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_41_44.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_44_47.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_44_47.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_44_47.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
-srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_47_50.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_47_50.wav  --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt     --class "Boana faber"     --out runs/attention_INCT4_20191223_033000_47_50.png          --spectrogram   --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_24_27.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_24_27.wav  --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_24_27.png         --spectrogram    --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_26_29.embeddings.npz  --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_26_29.wav   --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_26_29.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_39_42.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_39_42.wav  --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_39_42.png          --spectrogram   --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_41_44.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_41_44.wav  --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_41_44.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_44_47.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_44_47.wav  --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_44_47.png           --spectrogram  --wandb --wandb_project bird-mil-scratch-0_1
+srun uv run scripts/plot_attention.py     --npz /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/embeddings/INCT4/INCT4_20191223_033000_47_50.embeddings.npz   --audio /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/anuraset/audio/INCT4/INCT4_20191223_033000_47_50.wav  --checkpoint $gws_run_dir/attn_last.pt     --class "Boana faber"     --out $gws_run_dir/attention_INCT4_20191223_033000_47_50.png          --spectrogram   --wandb --wandb_project bird-mil-scratch-0_1
 
 srun uv run scripts/evaluate_mil.py \
-    --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_last.pt \
-    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt \
+    --checkpoint $gws_run_dir/attn_last.pt \
+    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1_scratch.txt \
     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels \
     --batch_size 64 \
     --pointing_game \
     --output /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/attn_test_results.json
 
 srun uv run scripts/evaluate_mil.py \
-    --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/linsoft_last.pt \
-    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt \
+    --checkpoint $gws_run_dir/linsoft_last.pt \
+    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1_scratch.txt \
     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels \
     --batch_size 64 \
     --pointing_game \
     --output /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/linsoft_test_results.json
 
 srun uv run scripts/evaluate_mil.py \
-    --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/lme_last.pt \
-    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt \
+    --checkpoint $gws_run_dir/lme_last.pt \
+    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1_scratch.txt \
     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels \
     --batch_size 64 \
     --pointing_game \
     --output /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/lme_test_results.json
 
 srun uv run scripts/evaluate_mil.py \
-    --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/max_last.pt \
-    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt \
+    --checkpoint $gws_run_dir/max_last.pt \
+    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1_scratch.txt \
     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels \
     --batch_size 64 \
     --pointing_game \
     --output /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/max_test_results.json
 
 srun uv run scripts/evaluate_mil.py \
-    --checkpoint /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/runs/run_20251210_165545_seed42/mean_last.pt \
-    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1.txt \
+    --checkpoint $gws_run_dir/mean_last.pt \
+    --emb_glob /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/train_test/test_0_1_scratch.txt \
     --strong_root /gws/nopw/j04/iecdt/dash/birdnet-V3.0-dev/data/AnuraSet/strong_labels \
     --batch_size 64 \
     --pointing_game \
