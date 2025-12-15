@@ -45,6 +45,8 @@ def load_array(path: Path) -> np.ndarray:
 
 def ensure_class_count(arrays: Sequence[np.ndarray]) -> int:
     n_classes = {a.shape[1] for a in arrays if a is not None}
+    if not n_classes:
+        raise ValueError("At least one label or prediction array is required to infer class count")
     if len(n_classes) != 1:
         raise ValueError("Label and prediction arrays must have the same number of classes")
     return n_classes.pop()
@@ -74,7 +76,11 @@ def summarize_distribution(
     counts = labels.sum(axis=0).astype(int)
     freqs = counts / total if total > 0 else np.zeros_like(counts, dtype=float)
     missing = [class_names[i] for i, c in enumerate(counts) if c == 0]
-    imbalanced = [class_names[i] for i, f in enumerate(freqs) if f < imbalance_threshold]
+    imbalanced = [
+        class_names[i]
+        for i, f in enumerate(freqs)
+        if f > 0 and f < imbalance_threshold
+    ]
     if missing:
         logging.warning("Missing classes (count=0): %s", missing)
     if imbalanced:
