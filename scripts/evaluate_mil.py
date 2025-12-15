@@ -175,6 +175,16 @@ def evaluate_model(
     def _per_class_scores(
         scorer, require_negative: bool = False
     ) -> list[float]:
+        """
+        Compute per-class scores while skipping classes without required labels.
+        
+        Args:
+            scorer: callable accepting (y_true, y_prob) and returning a scalar score.
+            require_negative: if True, skip classes that lack negative samples in y_true.
+        
+        Returns:
+            List of scores for classes that satisfy the sampling requirements.
+        """
         scores = []
         for class_idx in range(all_labels.shape[1]):
             y_true_cls = all_labels[:, class_idx]

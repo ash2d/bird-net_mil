@@ -12,8 +12,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 from pathlib import Path
-from typing import List, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -52,7 +53,7 @@ def ensure_class_count(arrays: Sequence[np.ndarray]) -> int:
     return n_classes.pop()
 
 
-def load_class_names(path: Path | None, n_classes: int) -> List[str]:
+def load_class_names(path: Path | None, n_classes: int) -> list[str]:
     if path is None:
         return [f"class_{i}" for i in range(n_classes)]
     with open(path, "r") as f:
@@ -165,4 +166,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())
