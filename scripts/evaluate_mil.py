@@ -116,6 +116,7 @@ def evaluate_model(
     all_probs = np.vstack(all_probs)
     all_labels = np.vstack(all_labels)
     
+    logger = logging.getLogger(__name__)
     # Compute metrics
     metrics = {}
     
@@ -125,34 +126,84 @@ def evaluate_model(
     )
     
     # Per-class metrics (micro and macro averaged)
+    positive_counts = all_labels.sum(axis=0)
+    pred_positive_counts = all_preds.sum(axis=0)
+    missing_positive_classes = [int(i) for i, c in enumerate(positive_counts) if c == 0]
+    zero_prediction_classes = [int(i) for i, c in enumerate(pred_positive_counts) if c == 0]
+    
+    if missing_positive_classes:
+        logger.warning(
+            "Skipping metrics for classes with no positive samples in y_true: %s",
+            missing_positive_classes,
+        )
+    if zero_prediction_classes:
+        logger.warning(
+            "Predictions are zero for all samples in classes: %s",
+            zero_prediction_classes,
+        )
+    
+    per_precision, per_recall, per_f1, _ = precision_recall_fscore_support(
+        all_labels, all_preds, average=None, zero_division=0
+    )
+    per_precision = per_precision.astype(float)
+    per_recall = per_recall.astype(float)
+    per_f1 = per_f1.astype(float)
+    
+    valid_mask = positive_counts > 0
+    per_precision[~valid_mask] = np.nan
+    per_recall[~valid_mask] = np.nan
+    per_f1[~valid_mask] = np.nan
+    
     precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(
         all_labels, all_preds, average="micro", zero_division=0
-    )
-    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
-        all_labels, all_preds, average="macro", zero_division=0
     )
     
     metrics["precision_micro"] = float(precision_micro)
     metrics["recall_micro"] = float(recall_micro)
     metrics["f1_micro"] = float(f1_micro)
-    metrics["precision_macro"] = float(precision_macro)
-    metrics["recall_macro"] = float(recall_macro)
-    metrics["f1_macro"] = float(f1_macro)
+    
+    if valid_mask.any():
+        metrics["precision_macro"] = float(np.nanmean(per_precision))
+        metrics["recall_macro"] = float(np.nanmean(per_recall))
+        metrics["f1_macro"] = float(np.nanmean(per_f1))
+    else:
+        metrics["precision_macro"] = None
+        metrics["recall_macro"] = None
+        metrics["f1_macro"] = None
     
     # AUC-ROC (macro averaged)
-    try:
-        auc_roc = roc_auc_score(all_labels, all_probs, average="macro")
-        metrics["auc_roc_macro"] = float(auc_roc)
-    except ValueError:
-        # Handle case where some classes have no positive samples
-        metrics["auc_roc_macro"] = None
+    auc_scores = []
+    for class_idx in range(all_labels.shape[1]):
+        y_true_cls = all_labels[:, class_idx]
+        y_prob_cls = all_probs[:, class_idx]
+        pos_count = y_true_cls.sum()
+        neg_count = len(y_true_cls) - pos_count
+        if pos_count == 0 or neg_count == 0:
+            continue
+        try:
+            auc_scores.append(roc_auc_score(y_true_cls, y_prob_cls))
+        except ValueError:
+            continue
+    metrics["auc_roc_macro"] = (
+        float(np.mean(auc_scores)) if auc_scores else None
+    )
     
     # Average Precision (macro averaged)
-    try:
-        avg_precision = average_precision_score(all_labels, all_probs, average="macro")
-        metrics["avg_precision_macro"] = float(avg_precision)
-    except ValueError:
-        metrics["avg_precision_macro"] = None
+    avg_precision_scores = []
+    for class_idx in range(all_labels.shape[1]):
+        y_true_cls = all_labels[:, class_idx]
+        y_prob_cls = all_probs[:, class_idx]
+        if y_true_cls.sum() == 0:
+            continue
+        try:
+            avg_precision_scores.append(
+                average_precision_score(y_true_cls, y_prob_cls)
+            )
+        except ValueError:
+            continue
+    metrics["avg_precision_macro"] = (
+        float(np.mean(avg_precision_scores)) if avg_precision_scores else None
+    )
     
     # Per-class accuracy
     class_accuracy = []
@@ -167,6 +218,9 @@ def evaluate_model(
     else:
         metrics["class_accuracy_mean"] = None
         metrics["class_accuracy_std"] = None
+    
+    metrics["missing_positive_classes"] = missing_positive_classes
+    metrics["zero_prediction_classes"] = zero_prediction_classes
     
     return metrics
 
