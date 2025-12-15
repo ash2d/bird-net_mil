@@ -85,7 +85,11 @@ def summarize_distribution(
     if missing:
         logging.warning("Missing classes (count=0): %s", missing)
     if imbalanced:
-        logging.info("Imbalanced classes (<%.2f%%): %s", imbalance_threshold * 100, imbalanced)
+        logging.info(
+            "Imbalanced classes (<%s of samples): %s",
+            f"{imbalance_threshold * 100:.2f}%",
+            imbalanced,
+        )
     per_class = []
     for idx, (count, freq) in enumerate(zip(counts, freqs)):
         per_class.append(
@@ -113,7 +117,7 @@ def main() -> int:
     parser.add_argument("--test-labels", required=True, help="Path to test labels file (.npy/.json/.csv/.txt)")
     parser.add_argument("--test-predictions", help="Optional path to test predictions file (.npy/.json/.csv/.txt)")
     parser.add_argument("--class-names", help="Optional text file with one class name per line")
-    parser.add_argument("--imbalance-threshold", type=float, default=0.01, help="Frequency threshold to flag imbalance (default: 1%%)")
+    parser.add_argument("--imbalance-threshold", type=float, default=0.01, help="Frequency threshold to flag imbalance (default: 1%)")
     parser.add_argument("--threshold", type=float, default=0.5, help="Threshold to binarize inputs (default: 0.5)")
     parser.add_argument("--output", type=str, default="coverage_analysis.json", help="Output JSON path (default: coverage_analysis.json)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")

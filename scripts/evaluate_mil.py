@@ -21,7 +21,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 import random
 
 import numpy as np
@@ -173,7 +173,7 @@ def evaluate_model(
     
     # AUC-ROC (macro averaged)
     def _per_class_scores(
-        scorer, require_negative: bool = False
+        scorer: Callable[[np.ndarray, np.ndarray], float], require_negative: bool = False
     ) -> list[float]:
         """
         Compute per-class scores while skipping classes without required labels.
