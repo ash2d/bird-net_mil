@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 def normalize_embedding_path(path: str | Path) -> str:
     """
     Normalize embedding paths for consistent matching.
+
+    Falls back to the original path string if resolution fails (e.g., broken
+    symlink or permission error) so lookups can still proceed.
     """
     try:
         return str(Path(path).expanduser().resolve())
@@ -210,12 +213,9 @@ def get_weak_labels_for_recording(
     row = None
 
     # Path-based lookup if available
-    if embedding_path is not None and "embedding_path" in df.columns:
+    if embedding_path is not None and "embedding_path_norm" in df.columns:
         path_norm = normalize_embedding_path(embedding_path)
-        if "embedding_path_norm" in df.columns:
-            matches = df[df["embedding_path_norm"] == path_norm]
-        else:
-            matches = df[df["embedding_path"].apply(normalize_embedding_path) == path_norm]
+        matches = df[df["embedding_path_norm"] == path_norm]
         if len(matches) > 0:
             row = matches.iloc[0]
 

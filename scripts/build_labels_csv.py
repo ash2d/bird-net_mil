@@ -49,8 +49,13 @@ def read_embedding_paths(emb_list: str | Path) -> List[Path]:
 
 def load_times(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """Load start/end times without materializing embeddings."""
-    data = np.load(npz_path)
-    return data["start_sec"].astype(np.float32), data["end_sec"].astype(np.float32)
+    try:
+        data = np.load(npz_path)
+        start_sec = data["start_sec"].astype(np.float32)
+        end_sec = data["end_sec"].astype(np.float32)
+    except KeyError as exc:
+        raise KeyError(f"Missing start_sec/end_sec in {npz_path}") from exc
+    return start_sec, end_sec
 
 
 def build_rows(
@@ -73,7 +78,10 @@ def build_rows(
             events = []
             logger.warning("No strong label file found for %s", npz_path)
 
-        start_sec, end_sec = load_times(npz_path)
+        try:
+            start_sec, end_sec = load_times(npz_path)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to read timing data from {npz_path}") from exc
         weak_labels, _ = events_to_labels(events, label_index, start_sec, end_sec)
 
         row = [emb_path_norm] + [
