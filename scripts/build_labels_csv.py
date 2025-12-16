@@ -84,6 +84,7 @@ def build_rows(
             raise RuntimeError(f"Failed to read timing data from {npz_path}") from exc
         weak_labels, _ = events_to_labels(events, label_index, start_sec, end_sec)
 
+        # species_by_index comes directly from label_index keys, so lookups are safe
         row = [emb_path_norm] + [
             float(weak_labels[label_index[sp]]) for sp in species_by_index
         ]

@@ -198,6 +198,9 @@ def get_weak_labels_for_recording(
     """
     Get weak labels for a specific recording from the weak label DataFrame.
     
+    Accepts columns with either ``SPECIES_<name>`` or raw species names
+    (for backward compatibility with older CSVs).
+    
     Args:
         df: DataFrame with weak labels.
         audio_file_id: Audio file ID (without path, without _<start>_<end> suffix).
