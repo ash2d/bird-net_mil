@@ -20,6 +20,19 @@ from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
 
+def normalize_embedding_path(path: str | Path) -> str:
+    """
+    Normalize embedding paths for consistent matching.
+
+    Falls back to the original path string if resolution fails (e.g., broken
+    symlink or permission error) so lookups can still proceed.
+    """
+    try:
+        return str(Path(path).expanduser().resolve())
+    except (FileNotFoundError, PermissionError):
+        return str(Path(path))
+
+
 def load_embeddings_npz(npz_path: str | Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Load embeddings from .npz file.
@@ -130,23 +143,29 @@ def load_weak_labels_csv(csv_path: str | Path) -> pd.DataFrame:
     Load weak labels from CSV file.
     
     CSV format should have columns:
-    - 'MONITORING_SITE': Site identifier
-    - 'AUDIO_FILE_ID': Audio filename (without path, without _<start>_<end> suffix)
+    - Either:
+      - 'embedding_path': Full path to embedding file, plus SPECIES_* columns
+      - or legacy columns 'MONITORING_SITE' and 'AUDIO_FILE_ID' plus SPECIES_* columns
     - 'SPECIES_<species_name>': Binary columns (0 or 1) for each species
     
     Args:
-        csv_path: Path to weak label CSV file.
-        
+    csv_path: Path to weak label CSV file.
+    
     Returns:
-        DataFrame with weak labels.
+    DataFrame with weak labels.
     """
     df = pd.read_csv(csv_path)
     
-    # Validate required columns
-    if 'MONITORING_SITE' not in df.columns:
-        raise ValueError("CSV must have 'MONITORING_SITE' column")
-    if 'AUDIO_FILE_ID' not in df.columns:
-        raise ValueError("CSV must have 'AUDIO_FILE_ID' column")
+    if "embedding_path" in df.columns:
+        df["embedding_path"] = df["embedding_path"].astype(str)
+        paths = df["embedding_path"]
+        df["embedding_path_norm"] = [normalize_embedding_path(p) for p in paths]
+    else:
+        # Validate legacy required columns
+        if 'MONITORING_SITE' not in df.columns:
+            raise ValueError("CSV must have 'MONITORING_SITE' column")
+        if 'AUDIO_FILE_ID' not in df.columns:
+            raise ValueError("CSV must have 'AUDIO_FILE_ID' column")
     
     return df
 
@@ -174,14 +193,19 @@ def get_weak_labels_for_recording(
     df: pd.DataFrame,
     audio_file_id: str,
     label_index: Dict[str, int],
+    embedding_path: str | Path | None = None,
 ) -> np.ndarray:
     """
     Get weak labels for a specific recording from the weak label DataFrame.
+    
+    Accepts columns with either ``SPECIES_<name>`` or raw species names
+    (for backward compatibility with older CSVs).
     
     Args:
         df: DataFrame with weak labels.
         audio_file_id: Audio file ID (without path, without _<start>_<end> suffix).
         label_index: Mapping from species to class index.
+        embedding_path: Optional full path to embedding for path-based CSVs.
         
     Returns:
         (C,) binary array of weak labels, or all zeros if recording not found.
@@ -189,20 +213,32 @@ def get_weak_labels_for_recording(
     C = len(label_index)
     weak_labels = np.zeros((C,), dtype=np.float32)
     
-    # Find matching row
-    matching_rows = df[df['AUDIO_FILE_ID'] == audio_file_id]
-    
-    if len(matching_rows) == 0:
+    row = None
+
+    # Path-based lookup if available
+    if embedding_path is not None and "embedding_path_norm" in df.columns:
+        path_norm = normalize_embedding_path(embedding_path)
+        matches = df[df["embedding_path_norm"] == path_norm]
+        if len(matches) > 0:
+            row = matches.iloc[0]
+
+    # Legacy lookup by AUDIO_FILE_ID
+    if row is None and "AUDIO_FILE_ID" in df.columns:
+        matching_rows = df[df['AUDIO_FILE_ID'] == audio_file_id]
+        if len(matching_rows) > 0:
+            row = matching_rows.iloc[0]
+
+    if row is None:
         return weak_labels
-    
-    # Use first matching row (should be only one)
-    row = matching_rows.iloc[0]
     
     # Fill in species labels
     for species, idx in label_index.items():
         col_name = f'SPECIES_{species}'
+        alt_col = species  # Accept unprefixed species columns for backward compatibility
         if col_name in row:
             weak_labels[idx] = float(row[col_name])
+        elif alt_col in row:
+            weak_labels[idx] = float(row[alt_col])
     
     return weak_labels
 
@@ -499,12 +535,14 @@ class EmbeddingBagDataset(Dataset):
         if self.weak_labels_df is not None:
             # Extract recording ID from npz path
             recording_id = extract_recording_id_from_path(npz_path)
+            embedding_path = normalize_embedding_path(npz_path)
             
-            # Get weak labels for this recording
+            # Get weak labels for this recording/path
             weak_labels = get_weak_labels_for_recording(
                 self.weak_labels_df,
                 recording_id,
                 self.label_index,
+                embedding_path=embedding_path,
             )
             # For weak labels, we don't have time-level labels, keep them as zeros
         else:
