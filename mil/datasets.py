@@ -26,7 +26,7 @@ def normalize_embedding_path(path: str | Path) -> str:
     """
     try:
         return str(Path(path).expanduser().resolve())
-    except (OSError, RuntimeError, ValueError):
+    except OSError:
         return str(Path(path))
 
 

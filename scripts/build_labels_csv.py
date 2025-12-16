@@ -12,11 +12,13 @@ Example:
 from __future__ import annotations
 
 import argparse
+import glob
 import logging
 import sys
 from pathlib import Path
 from typing import Iterable, List
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,7 +27,6 @@ from mil.datasets import (
     _find_strong_label_file,
     build_label_index,
     events_to_labels,
-    load_embeddings_npz,
     normalize_embedding_path,
     parse_strong_labels,
 )
@@ -43,7 +44,13 @@ def read_embedding_paths(emb_list: str | Path) -> List[Path]:
         with open(emb_list, "r") as f:
             return [Path(line.strip()) for line in f if line.strip()]
     pattern = str(emb_list)
-    return [p for p in sorted(Path().glob(pattern))]
+    return [Path(p) for p in sorted(glob.glob(pattern, recursive=True))]
+
+
+def load_times(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load start/end times without materializing embeddings."""
+    data = np.load(npz_path)
+    return data["start_sec"].astype(np.float32), data["end_sec"].astype(np.float32)
 
 
 def build_rows(
@@ -66,7 +73,7 @@ def build_rows(
             events = []
             logger.warning("No strong label file found for %s", npz_path)
 
-        embeddings, start_sec, end_sec = load_embeddings_npz(npz_path)
+        start_sec, end_sec = load_times(npz_path)
         weak_labels, _ = events_to_labels(events, label_index, start_sec, end_sec)
 
         row = [emb_path_norm] + [
