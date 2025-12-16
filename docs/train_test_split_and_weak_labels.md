@@ -37,7 +37,24 @@ python scripts/create_train_test_split.py \
 - Two text files containing paths to embeddings (one path per line)
 - These can be passed to training/evaluation scripts via `--emb_glob`
 
-### 2. Weak Label Support
+### 2. Build Weak Label CSV from Strong Labels
+
+Use `scripts/build_labels_csv.py` to convert strong label `.txt` files into a path-based weak label CSV that can be passed to `train_mil.py`/`evaluate_mil.py`.
+
+```bash
+python scripts/build_labels_csv.py \
+    --emb_list train.txt \
+    --strong_root /path/to/strong_labels \
+    --output train.csv
+```
+
+Run it again with `test.txt` to create `test.csv` for evaluation.  
+The generated CSV has columns:
+
+- `embedding_path`: Full path to the `.embeddings.npz` file
+- `SPECIES_<species>`: One-hot columns indicating presence for that clip
+
+### 3. Weak Label Support
 
 The dataset code now supports weak labels from CSV files in addition to strong labels from text files.
 
@@ -77,7 +94,7 @@ python scripts/evaluate_mil.py \
 
 **Note:** When using weak labels, time-level labels are not available (set to zeros). Only clip-level (weak) labels are used.
 
-### 3. Reading Paths from File
+### 4. Reading Paths from File
 
 Both `train_mil.py` and `evaluate_mil.py` now support reading embedding paths from a text file via the `--emb_glob` argument.
 
@@ -101,19 +118,23 @@ python scripts/create_train_test_split.py \
     --train_out train.txt \
     --test_out test.txt
 
-# 2. Train model on training set with weak labels
+# 2. Convert strong labels to weak CSVs aligned to those splits
+python scripts/build_labels_csv.py --emb_list train.txt --strong_root /data/strong_labels --output train.csv
+python scripts/build_labels_csv.py --emb_list test.txt --strong_root /data/strong_labels --output test.csv
+
+# 3. Train model on training set with weak labels
 python scripts/train_mil.py \
     --emb_glob train.txt \
-    --weak_csv /data/weak_labels.csv \
+    --weak_csv train.csv \
     --poolers attn \
     --epochs 50 \
     --out_dir ./experiments
 
-# 3. Evaluate on test set
+# 4. Evaluate on test set
 python scripts/evaluate_mil.py \
     --checkpoint ./experiments/run_XXX/attn_best.pt \
     --emb_glob test.txt \
-    --weak_csv /data/weak_labels.csv \
+    --weak_csv test.csv \
     --output test_results.json
 ```
 

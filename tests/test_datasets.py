@@ -301,6 +301,42 @@ class TestBuildLabelIndex:
 class TestWeakLabels:
     """Test weak label CSV loading and processing."""
     
+    def test_load_weak_labels_csv_with_embedding_paths(self, tmp_path):
+        """Test loading weak labels that include embedding paths."""
+        csv_file = tmp_path / "weak_labels.csv"
+        emb_path = tmp_path / "REC_001.embeddings.npz"
+        csv_content = f"embedding_path,SPECIES_Boana_faber\n{emb_path},1\n"
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        
+        assert len(df) == 1
+        assert "embedding_path_norm" in df.columns
+        assert df.loc[0, "embedding_path_norm"].endswith("REC_001.embeddings.npz")
+    
+    def test_get_weak_labels_for_embedding_path(self, tmp_path):
+        """Test retrieving weak labels using embedding path lookup."""
+        csv_file = tmp_path / "weak_labels.csv"
+        emb_path = tmp_path / "REC_001.embeddings.npz"
+        csv_content = (
+            "embedding_path,SPECIES_Boana_faber,SPECIES_Dendropsophus_minutus\n"
+            f"{emb_path},1,0\n"
+        )
+        csv_file.write_text(csv_content)
+        
+        df = load_weak_labels_csv(csv_file)
+        label_index = {"Boana_faber": 0, "Dendropsophus_minutus": 1}
+        
+        labels = get_weak_labels_for_recording(
+            df,
+            "REC_001",
+            label_index,
+            embedding_path=emb_path,
+        )
+        
+        assert labels[0] == 1.0  # Boana_faber
+        assert labels[1] == 0.0  # Dendropsophus_minutus
+    
     def test_load_weak_labels_csv(self, tmp_path):
         """Test loading weak labels from CSV."""
         csv_file = tmp_path / "weak_labels.csv"
