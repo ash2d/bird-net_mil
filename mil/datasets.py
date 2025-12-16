@@ -26,7 +26,7 @@ def normalize_embedding_path(path: str | Path) -> str:
     """
     try:
         return str(Path(path).expanduser().resolve())
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         return str(Path(path))
 
 
@@ -155,7 +155,8 @@ def load_weak_labels_csv(csv_path: str | Path) -> pd.DataFrame:
     
     if "embedding_path" in df.columns:
         df["embedding_path"] = df["embedding_path"].astype(str)
-        df["embedding_path_norm"] = df["embedding_path"].apply(normalize_embedding_path)
+        paths = df["embedding_path"]
+        df["embedding_path_norm"] = [normalize_embedding_path(p) for p in paths]
     else:
         # Validate legacy required columns
         if 'MONITORING_SITE' not in df.columns:

@@ -12,7 +12,6 @@ Example:
 from __future__ import annotations
 
 import argparse
-import glob
 import logging
 import sys
 from pathlib import Path
@@ -43,7 +42,8 @@ def read_embedding_paths(emb_list: str | Path) -> List[Path]:
     if emb_list.is_file():
         with open(emb_list, "r") as f:
             return [Path(line.strip()) for line in f if line.strip()]
-    return [Path(p) for p in sorted(glob.glob(str(emb_list), recursive=True))]
+    pattern = str(emb_list)
+    return [p for p in sorted(Path().glob(pattern))]
 
 
 def build_rows(
@@ -124,7 +124,11 @@ def main() -> int:
         return 1
 
     if args.species_list:
-        with open(args.species_list, "r") as f:
+        species_path = Path(args.species_list)
+        if not species_path.is_file():
+            logger.error("Species list file not found: %s", species_path)
+            return 1
+        with species_path.open("r") as f:
             species = [line.strip() for line in f if line.strip()]
         label_index = build_label_index(species_list=species)
     else:
