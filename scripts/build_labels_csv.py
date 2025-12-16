@@ -80,7 +80,7 @@ def build_rows(
 
         try:
             start_sec, end_sec = load_times(npz_path)
-        except Exception as exc:
+        except (OSError, KeyError, ValueError) as exc:
             raise RuntimeError(f"Failed to read timing data from {npz_path}") from exc
         weak_labels, _ = events_to_labels(events, label_index, start_sec, end_sec)
 

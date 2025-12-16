@@ -29,7 +29,7 @@ def normalize_embedding_path(path: str | Path) -> str:
     """
     try:
         return str(Path(path).expanduser().resolve())
-    except OSError:
+    except (FileNotFoundError, PermissionError):
         return str(Path(path))
 
 
@@ -231,7 +231,7 @@ def get_weak_labels_for_recording(
     # Fill in species labels
     for species, idx in label_index.items():
         col_name = f'SPECIES_{species}'
-        alt_col = species
+        alt_col = species  # Accept unprefixed species columns for backward compatibility
         if col_name in row:
             weak_labels[idx] = float(row[col_name])
         elif alt_col in row:
