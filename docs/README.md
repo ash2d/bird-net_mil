@@ -131,9 +131,9 @@ Where `<species_quality>` is the species name followed by an underscore and an a
 
 **Example** (`INCT17_20200211_041500.txt`):
 ```
-0.5 2.3 Boana_faber_H
-1.2 4.5 Dendropsophus_minutus_M
-15.0 18.0 Scinax_fuscovarius_L
+0.5 2.3 BOAFAB_H
+1.2 4.5 DENMIN_M
+15.0 18.0 SCIFUV_L
 ```
 
 The code automatically:
