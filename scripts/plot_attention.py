@@ -45,6 +45,7 @@ from mil.train import load_checkpoint
 from mil.datasets import (
     build_label_index,
     load_embeddings_npz,
+    load_species_list,
     normalize_species_name,
     parse_strong_labels,
 )
@@ -88,17 +89,6 @@ def get_ground_truth_spans(
         if species == target
     ]
     return spans
-
-
-def load_species_list(path: str | Path) -> List[str]:
-    """Load species list from text file (one species per line)."""
-    species = []
-    with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                species.append(normalize_species_name(line))
-    return species
 
 
 def main() -> int:

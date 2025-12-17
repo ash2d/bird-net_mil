@@ -42,7 +42,7 @@ from mil.datasets import (
     EmbeddingBagDataset,
     collate_fn,
     build_label_index,
-    normalize_species_name,
+    load_species_list,
 )
 from mil.train import Trainer
 from mil.evaluate import pointing_game
@@ -74,17 +74,6 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-
-def load_species_list(path: str | Path) -> List[str]:
-    """Load species list from text file (one species per line)."""
-    species = []
-    with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                species.append(normalize_species_name(line))
-    return species
 
 
 def main() -> int:

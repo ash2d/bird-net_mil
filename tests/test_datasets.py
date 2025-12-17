@@ -436,6 +436,18 @@ SITE_A,REC_001,1,0,1
         assert label_index["Dendropsophus_minutus"] == 1
         assert label_index["Scinax_fuscovarius"] == 2
 
+    def test_build_label_index_normalizes_weak_species_names(self, tmp_path):
+        """Test that species names from weak CSV are normalized consistently."""
+        csv_file = tmp_path / "weak_labels.csv"
+        csv_content = """MONITORING_SITE,AUDIO_FILE_ID,SPECIES_Boana faber
+SITE_A,REC_001,1
+"""
+        csv_file.write_text(csv_content)
+        
+        label_index = build_label_index(weak_csv=csv_file)
+        
+        assert list(label_index.keys()) == ["Boana_faber"]
+
 
 
 if __name__ == "__main__":

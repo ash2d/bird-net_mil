@@ -29,6 +29,17 @@ def normalize_species_name(name: str) -> str:
     return name.strip().replace(" ", "_")
 
 
+def load_species_list(path: str | Path) -> List[str]:
+    """Load species list from text file (one species per line)."""
+    species: List[str] = []
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                species.append(normalize_species_name(line))
+    return species
+
+
 def normalize_embedding_path(path: str | Path) -> str:
     """
     Normalize embedding paths for consistent matching.
@@ -193,7 +204,7 @@ def extract_species_from_weak_csv(df: pd.DataFrame) -> List[str]:
     species = []
     for col in df.columns:
         if col.startswith('SPECIES_'):
-            species_name = col[8:]  # Remove 'SPECIES_' prefix
+            species_name = normalize_species_name(col[8:])  # Remove 'SPECIES_' prefix
             species.append(species_name)
     
     return sorted(species)
@@ -289,7 +300,7 @@ def build_label_index(
         for txt_path in strong_root.glob("**/*.txt"):
             events = parse_strong_labels(txt_path)
             for _, _, species, _ in events:  # Now unpacking 4 elements
-                all_species.add(species)
+                all_species.add(normalize_species_name(species))
         
         all_species = sorted(all_species)
         logger.info(f"Found {len(all_species)} species in strong labels")

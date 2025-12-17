@@ -44,20 +44,10 @@ from mil.datasets import (
     collate_fn,
     build_label_index,
     normalize_species_name,
+    load_species_list,
 )
 from mil.train import load_checkpoint
 from mil.evaluate import pointing_game
-
-
-def load_species_list(path: str | Path) -> list:
-    """Load species list from text file (one species per line)."""
-    species = []
-    with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                species.append(normalize_species_name(line))
-    return species
 
 
 def setup_logging(verbose: bool = False) -> None:
