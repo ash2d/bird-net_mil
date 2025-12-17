@@ -20,6 +20,15 @@ from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
 
+def normalize_species_name(name: str) -> str:
+    """
+    Normalize species names for consistent lookup.
+    
+    Replaces spaces with underscores and strips surrounding whitespace.
+    """
+    return name.strip().replace(" ", "_")
+
+
 def normalize_embedding_path(path: str | Path) -> str:
     """
     Normalize embedding paths for consistent matching.
@@ -94,6 +103,7 @@ def parse_strong_labels(txt_path: str | Path) -> List[Tuple[float, float, str, s
                 # Parse species_quality format: <species>_<quality>
                 # Quality is the last character after the last underscore (L, M, or H)
                 species, quality = parse_species_quality(species_quality)
+                species = normalize_species_name(species)
                 events.append((start, end, species, quality))
             except ValueError:
                 logger.warning(f"Failed to parse line in {txt_path}: {line}")
@@ -265,7 +275,8 @@ def build_label_index(
         Dictionary mapping species name to class index.
     """
     if species_list is not None:
-        all_species = sorted(set(species_list))
+        cleaned_species = [normalize_species_name(sp) for sp in species_list]
+        all_species = sorted(set(cleaned_species))
     elif weak_csv is not None:
         df = load_weak_labels_csv(weak_csv)
         all_species = extract_species_from_weak_csv(df)

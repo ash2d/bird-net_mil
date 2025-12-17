@@ -197,6 +197,7 @@ class Trainer:
         wandb_run_id: Optional[str] = None,
         wandb_group: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
+        label_index: Optional[Dict[str, int]] = None,
     ):
         """
         Initialize trainer.
@@ -226,6 +227,7 @@ class Trainer:
         self.criterion = get_criterion(head.pool_name)
         
         self.losses: Dict[str, List[float]] = {"train": [], "val": []}
+        self.label_index = label_index
         
         # W&B setup
         self.use_wandb = use_wandb and WANDB_AVAILABLE
@@ -360,6 +362,7 @@ class Trainer:
             "n_classes": self.head.n_classes,
             "in_dim": self.head.in_dim,
             "losses": self.losses,
+            "label_index": self.label_index,
         }, path)
         logger.debug(f"Saved checkpoint to {path}")
         return path

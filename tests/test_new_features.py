@@ -110,7 +110,7 @@ def test_checkpoint_save_every():
     print("Testing save_every parameter...")
     
     from mil.heads import PoolingHead
-    from mil.train import Trainer
+    from mil.train import Trainer, load_checkpoint
     from torch.utils.data import DataLoader, TensorDataset
     
     # Create dummy data
@@ -152,6 +152,42 @@ def test_checkpoint_save_every():
         
         print("✓ save_every parameter works correctly")
 
+
+def test_checkpoint_preserves_label_index():
+    """Ensure checkpoints retain the label index for consistent evaluation."""
+    
+    from mil.heads import PoolingHead
+    from mil.train import Trainer, load_checkpoint
+    from torch.utils.data import DataLoader, TensorDataset
+    
+    embeddings = torch.randn(4, 3, 16)
+    labels = torch.randint(0, 2, (4, 2)).float()
+    dataset = TensorDataset(embeddings, labels)
+    
+    def simple_collate(batch):
+        embs = torch.stack([b[0] for b in batch])
+        lbls = torch.stack([b[1] for b in batch])
+        return embs, lbls, torch.zeros(embs.shape[0], embs.shape[1], lbls.shape[1]), None
+    
+    loader = DataLoader(dataset, batch_size=2, collate_fn=simple_collate)
+    label_index = {"Species_A": 0, "Species_B": 1}
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        trainer = Trainer(
+            head=PoolingHead(in_dim=16, n_classes=2, pool="mean"),
+            train_loader=loader,
+            val_loader=None,
+            device="cpu",
+            out_dir=tmpdir,
+            use_wandb=False,
+            label_index=label_index,
+        )
+        
+        trainer.train(epochs=1)
+        ckpt_path = Path(tmpdir) / "mean_last.pt"
+        _, checkpoint = load_checkpoint(ckpt_path, device="cpu")
+        
+        assert checkpoint.get("label_index") == label_index
 
 def main():
     """Run all tests."""

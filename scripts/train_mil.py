@@ -38,7 +38,12 @@ from torch.utils.data import DataLoader, random_split
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mil.heads import PoolingHead, POOLER_NAMES
-from mil.datasets import EmbeddingBagDataset, collate_fn, build_label_index
+from mil.datasets import (
+    EmbeddingBagDataset,
+    collate_fn,
+    build_label_index,
+    normalize_species_name,
+)
 from mil.train import Trainer
 from mil.evaluate import pointing_game
 import glob
@@ -78,7 +83,7 @@ def load_species_list(path: str | Path) -> List[str]:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#"):
-                species.append(line)
+                species.append(normalize_species_name(line))
     return species
 
 
@@ -367,6 +372,7 @@ def main() -> int:
                     "seed": args.seed,
                     "run_id": run_id,
                 },
+                label_index=label_index,
             )
             
             # Train
