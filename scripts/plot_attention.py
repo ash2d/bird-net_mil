@@ -42,7 +42,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mil.train import load_checkpoint
-from mil.datasets import load_embeddings_npz, parse_strong_labels
+from mil.datasets import (
+    build_label_index,
+    load_embeddings_npz,
+    load_species_list,
+    normalize_species_name,
+    parse_strong_labels,
+)
 from mil.evaluate import (
     get_clip_attention,
     plot_attention,
@@ -75,8 +81,13 @@ def get_ground_truth_spans(
     class_name: str,
 ) -> List[Tuple[float, float]]:
     """Get ground truth event spans for a specific class."""
+    target = normalize_species_name(class_name)
     events = parse_strong_labels(strong_path)
-    spans = [(start, end) for start, end, species in events if species == class_name]
+    spans = [
+        (start, end)
+        for start, end, species, _ in events
+        if species == target
+    ]
     return spans
 
 
@@ -99,6 +110,10 @@ def main() -> int:
     parser.add_argument(
         "--class", dest="class_name", type=str, required=True,
         help="Class name (species) to visualize",
+    )
+    parser.add_argument(
+        "--species_list", type=str, default=None,
+        help="Path to species list file for class mapping (one species per line)",
     )
     
     # Output
@@ -184,37 +199,51 @@ def main() -> int:
         logger.info(f"Loading embeddings from {npz_path}")
         embeddings, start_sec, end_sec = load_embeddings_npz(npz_path)
         
-        # Find class index
-        # We need to get the label index from somewhere - check if it's in the dataset
-        # For now, we'll try to infer from checkpoint or use a heuristic
-        # This is a limitation - ideally we'd save label_index in checkpoint
+        # Resolve label index (prefer checkpoint metadata for correct ordering)
+        label_index = None
+        checkpoint_label_index = checkpoint.get("label_index")
+        if checkpoint_label_index:
+            label_index = {k: int(v) for k, v in checkpoint_label_index.items()}
+            logger.info("Loaded label index from checkpoint metadata")
         
-        # Try to find species list from strong labels
-        species_to_idx = None
-        if args.strong:
-            from mil.datasets import build_label_index
+        if label_index is None and args.species_list:
+            species_list = load_species_list(args.species_list)
+            label_index = build_label_index(species_list=species_list)
+            logger.info("Loaded label index from species_list file")
+        
+        if label_index is None and args.strong:
             strong_root = Path(args.strong).parent.parent  # Go up from file to root
-            species_to_idx = build_label_index(strong_root=strong_root)
+            label_index = build_label_index(strong_root=strong_root)
+            logger.info("Built label index from strong labels")
         
-        if species_to_idx is None:
+        target_name = normalize_species_name(args.class_name)
+        resolved_name = target_name
+        if label_index is None:
             # Fall back to using class index as class name
-            logger.warning("Could not determine species index. Using class 0.")
+            logger.warning("Could not determine species index mapping. Using class 0.")
             class_idx = 0
-        elif args.class_name in species_to_idx:
-            class_idx = species_to_idx[args.class_name]
+        elif target_name in label_index:
+            class_idx = label_index[target_name]
         else:
             # Try to find by partial match
-            matches = [sp for sp in species_to_idx.keys() if args.class_name.lower() in sp.lower()]
+            matches = [sp for sp in label_index.keys() if target_name.lower() in sp.lower()]
             if matches:
-                class_idx = species_to_idx[matches[0]]
-                logger.info(f"Matched class '{args.class_name}' to '{matches[0]}'")
+                resolved_name = matches[0]
+                class_idx = label_index[resolved_name]
+                logger.info(f"Matched class '{args.class_name}' to '{resolved_name}'")
             else:
                 logger.error(f"Class '{args.class_name}' not found in label index")
-                logger.info(f"Available classes: {list(species_to_idx.keys())[:10]}...")
+                logger.info(f"Available classes: {list(label_index.keys())[:10]}...")
                 return 1
         
+        if class_idx >= head.n_classes:
+            logger.error(
+                f"Requested class index {class_idx} exceeds model classes ({head.n_classes})."
+            )
+            return 1
+        
         # Get attention weights
-        logger.info(f"Computing attention for class {class_idx} ({args.class_name})")
+        logger.info(f"Computing attention for class {class_idx} ({resolved_name})")
         attention = get_clip_attention(head, embeddings, class_idx, args.device)
         
         # Compute time points (center of each chunk)
@@ -223,7 +252,7 @@ def main() -> int:
         # Get ground truth spans if available
         gt_spans = None
         if args.strong and Path(args.strong).exists():
-            gt_spans = get_ground_truth_spans(args.strong, args.class_name)
+            gt_spans = get_ground_truth_spans(args.strong, resolved_name)
             if gt_spans:
                 logger.info(f"Found {len(gt_spans)} ground truth events")
         
@@ -241,7 +270,7 @@ def main() -> int:
             out_path = Path(args.out)
         else:
             stem = npz_path.stem.replace(".embeddings", "")
-            class_clean = args.class_name.replace(" ", "_").replace("/", "-")
+            class_clean = resolved_name.replace(" ", "_").replace("/", "-")
             out_path = Path("runs") / f"attention_{stem}_{class_clean}.png"
         
         # Plot attention
@@ -249,7 +278,7 @@ def main() -> int:
         plot_attention(
             attention_weights=attention,
             times=times,
-            class_name=args.class_name,
+            class_name=resolved_name,
             out_path=out_path,
             ground_truth_spans=gt_spans,
             spectrogram=spectrogram,
@@ -268,7 +297,7 @@ def main() -> int:
             del_ins_path = out_path.parent / f"{out_path.stem}_del_ins.png"
             plot_deletion_insertion(
                 fractions, del_scores, ins_scores,
-                del_ins_path, args.class_name, args.dpi
+                del_ins_path, resolved_name, args.dpi
             )
         
         # W&B logging
@@ -280,13 +309,13 @@ def main() -> int:
                     wandb.init(
                         project=args.wandb_project,
                         entity=args.wandb_entity,
-                        name=f"attention_{npz_path.stem}_{args.class_name}",
+                        name=f"attention_{npz_path.stem}_{resolved_name}",
                         job_type="visualization",
                     )
                     
                     wandb.log({
                         "attention_plot": wandb.Image(str(out_path)),
-                        "class_name": args.class_name,
+                        "class_name": resolved_name,
                         "npz_file": str(npz_path),
                     })
                     

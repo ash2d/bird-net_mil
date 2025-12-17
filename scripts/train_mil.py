@@ -38,7 +38,12 @@ from torch.utils.data import DataLoader, random_split
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mil.heads import PoolingHead, POOLER_NAMES
-from mil.datasets import EmbeddingBagDataset, collate_fn, build_label_index
+from mil.datasets import (
+    EmbeddingBagDataset,
+    collate_fn,
+    build_label_index,
+    load_species_list,
+)
 from mil.train import Trainer
 from mil.evaluate import pointing_game
 import glob
@@ -69,17 +74,6 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-
-def load_species_list(path: str | Path) -> List[str]:
-    """Load species list from text file (one species per line)."""
-    species = []
-    with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                species.append(line)
-    return species
 
 
 def main() -> int:
@@ -367,6 +361,7 @@ def main() -> int:
                     "seed": args.seed,
                     "run_id": run_id,
                 },
+                label_index=label_index,
             )
             
             # Train

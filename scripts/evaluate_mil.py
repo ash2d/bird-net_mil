@@ -39,20 +39,15 @@ from sklearn.metrics import (
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mil.heads import PoolingHead
-from mil.datasets import EmbeddingBagDataset, collate_fn, build_label_index
+from mil.datasets import (
+    EmbeddingBagDataset,
+    collate_fn,
+    build_label_index,
+    normalize_species_name,
+    load_species_list,
+)
 from mil.train import load_checkpoint
 from mil.evaluate import pointing_game
-
-
-def load_species_list(path: str | Path) -> list:
-    """Load species list from text file (one species per line)."""
-    species = []
-    with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                species.append(line)
-    return species
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -323,13 +318,30 @@ def main() -> int:
         
         # Build label index (must match training)
         logger.info("Building label index...")
+        label_index = None
+        checkpoint_label_index = checkpoint.get("label_index")
+        if checkpoint_label_index:
+            # Ensure indices are ints (JSON may convert to strings)
+            label_index = {k: int(v) for k, v in checkpoint_label_index.items()}
+            logger.info("Loaded label index from checkpoint metadata")
+        
+        species_list_index = None
         if args.species_list:
             species_list = load_species_list(args.species_list)
-            label_index = build_label_index(species_list=species_list)
-        elif args.weak_csv:
-            label_index = build_label_index(weak_csv=args.weak_csv)
-        else:
-            label_index = build_label_index(strong_root=args.strong_root)
+            species_list_index = build_label_index(species_list=species_list)
+            if label_index is None:
+                label_index = species_list_index
+            elif set(label_index.keys()) != set(species_list_index.keys()):
+                logger.warning(
+                    "species_list does not match checkpoint label index; "
+                    "using checkpoint mapping to preserve class order."
+                )
+        
+        if label_index is None:
+            if args.weak_csv:
+                label_index = build_label_index(weak_csv=args.weak_csv)
+            else:
+                label_index = build_label_index(strong_root=args.strong_root)
         
         n_classes = len(label_index)
         if n_classes != head.n_classes:
